@@ -1,9 +1,11 @@
 # ==============================================================================
-#  YD Core — polyphonic workstation synthesizer
-#  (c) 2026 Yangdozze. Licensed under AGPL-3.0 (see LICENSE).
+#  GLOBUS — polyphonic workstation synthesizer by Ninth Parallel Audio
+#  (c) 2026 Ninth Parallel Audio. Licensed under AGPL-3.0 (see LICENSE).
+#  (Internal target/repo names keep the original YDCore identifiers so that
+#   host projects, saved state and CI paths remain compatible.)
 # ==============================================================================
 cmake_minimum_required(VERSION 3.22)
-project(YDCore VERSION 1.0.0 LANGUAGES C CXX)
+project(YDCore VERSION 1.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,10 +20,10 @@ endif()
 # otherwise fetch the pinned release (CI).
 # ------------------------------------------------------------------------------
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/JUCE/CMakeLists.txt")
-    message(STATUS "YD Core: using local JUCE at libs/JUCE")
+    message(STATUS "GLOBUS: using local JUCE at libs/JUCE")
     add_subdirectory(libs/JUCE)
 else()
-    message(STATUS "YD Core: fetching JUCE 8.0.15")
+    message(STATUS "GLOBUS: fetching JUCE 8.0.15")
     include(FetchContent)
     FetchContent_Declare(JUCE
         GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
@@ -41,9 +43,9 @@ list(FILTER YDCORE_PRESET_FILES EXCLUDE REGEX "factory_bundle\\.json$")
 if(NOT YDCORE_PRESET_FILES)
     set(YDCORE_BUNDLE "${CMAKE_CURRENT_SOURCE_DIR}/Presets/factory_bundle.json")
     if(NOT EXISTS "${YDCORE_BUNDLE}")
-        message(FATAL_ERROR "YD Core: no presets found (need Presets/*.json or Presets/factory_bundle.json — run tools/gen_presets.py)")
+        message(FATAL_ERROR "GLOBUS: no presets found (need Presets/*.json or Presets/factory_bundle.json — run tools/gen_presets.py)")
     endif()
-    message(STATUS "YD Core: splitting factory preset bundle")
+    message(STATUS "GLOBUS: splitting factory preset bundle")
     file(READ "${YDCORE_BUNDLE}" YDCORE_BUNDLE_JSON)
     string(JSON YDCORE_PRESET_COUNT_RAW LENGTH "${YDCORE_BUNDLE_JSON}")
     math(EXPR YDCORE_LAST "${YDCORE_PRESET_COUNT_RAW} - 1")
@@ -58,7 +60,7 @@ if(NOT YDCORE_PRESET_FILES)
     file(GLOB YDCORE_PRESET_FILES "${YDCORE_PRESET_OUT}/*.json")
 endif()
 list(LENGTH YDCORE_PRESET_FILES YDCORE_PRESET_COUNT)
-message(STATUS "YD Core: embedding ${YDCORE_PRESET_COUNT} factory presets")
+message(STATUS "GLOBUS: embedding ${YDCORE_PRESET_COUNT} factory presets")
 juce_add_binary_data(YDCorePresetData SOURCES ${YDCORE_PRESET_FILES})
 set_target_properties(YDCorePresetData PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -80,9 +82,11 @@ set(YDCORE_SOURCES
 # Plugin targets: VST3 + Standalone
 # ------------------------------------------------------------------------------
 juce_add_plugin(YDCore
-    PRODUCT_NAME                "YD Core"
-    COMPANY_NAME                "Yangdozze"
-    BUNDLE_ID                   com.yangdozze.ydcore
+    PRODUCT_NAME                "GLOBUS"
+    COMPANY_NAME                "Ninth Parallel Audio"
+    BUNDLE_ID                   com.ninthparallel.globus
+    # 4-char codes intentionally unchanged: hosts identify the plugin by them,
+    # so existing projects and saved VST3 state keep loading after the rebrand.
     PLUGIN_MANUFACTURER_CODE    Ydzz
     PLUGIN_CODE                 YdC1
     FORMATS                     VST3 Standalone
@@ -118,7 +122,7 @@ target_link_libraries(YDCore
 # ------------------------------------------------------------------------------
 # Headless smoke-test app (no audio device needed; renders offline)
 # ------------------------------------------------------------------------------
-option(YDCORE_BUILD_TESTS "Build the YD Core headless verification app" ON)
+option(YDCORE_BUILD_TESTS "Build the GLOBUS headless verification app" ON)
 if(YDCORE_BUILD_TESTS)
     juce_add_console_app(YDCoreTests PRODUCT_NAME "YDCoreTests")
     target_sources(YDCoreTests PRIVATE Tests/HeadlessTests.cpp ${YDCORE_SOURCES})
