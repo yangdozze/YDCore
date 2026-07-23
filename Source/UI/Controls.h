@@ -1,4 +1,4 @@
-// YD Core — reusable UI building blocks: labelled knobs, selectors, toggles,
+// GLOBUS — reusable UI building blocks: labelled knobs, selectors, toggles,
 // section panels. Every control auto-wires tooltips, double-click reset and
 // shift-drag fine adjustment.
 #pragma once
@@ -30,15 +30,15 @@ private:
     }
 };
 
-/** Labelled rotary knob bound to one parameter. */
+/** Labelled rotary knob bound to one parameter.
+    The label swaps to a live value readout while hovering or dragging. */
 class Knob : public juce::Component
 {
 public:
-    explicit Knob (const juce::String& text)
+    explicit Knob (const juce::String& text) : name (text)
     {
         slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         slider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-        slider.setPopupDisplayEnabled (true, true, nullptr);
         addAndMakeVisible (slider);
 
         label.setText (text, juce::dontSendNotification);
@@ -47,15 +47,21 @@ public:
         label.setColour (juce::Label::textColourId, theme::textDim);
         label.setInterceptsMouseClicks (false, false);
         addAndMakeVisible (label);
+
+        slider.addMouseListener (this, false);
+        slider.onValueChange = [this] { if (showingValue) updateValueText(); };
     }
+
+    ~Knob() override { slider.removeMouseListener (this); }
 
     void attach (juce::AudioProcessorValueTreeState& apvts, const juce::String& paramID)
     {
         attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (apvts, paramID, slider);
-        if (auto* p = apvts.getParameter (paramID))
+        param = apvts.getParameter (paramID);
+        if (param != nullptr)
         {
-            const auto& range = p->getNormalisableRange();
-            slider.setDoubleClickReturnValue (true, range.convertFrom0to1 (p->getDefaultValue()));
+            const auto& range = param->getNormalisableRange();
+            slider.setDoubleClickReturnValue (true, range.convertFrom0to1 (param->getDefaultValue()));
         }
         const auto tip = getTooltip (paramID);
         slider.setTooltip (tip);
@@ -63,6 +69,14 @@ public:
     }
 
     void setAccent (juce::Colour c) { slider.setColour (juce::Slider::rotarySliderFillColourId, c); }
+
+    void mouseEnter (const juce::MouseEvent&) override { showingValue = true;  updateValueText(); }
+    void mouseExit  (const juce::MouseEvent&) override
+    {
+        showingValue = false;
+        label.setColour (juce::Label::textColourId, theme::textDim);
+        label.setText (name, juce::dontSendNotification);
+    }
 
     void resized() override
     {
@@ -75,6 +89,20 @@ public:
     juce::Label label;
 
 private:
+    void updateValueText()
+    {
+        juce::String v;
+        if (param != nullptr)
+            v = param->getText (param->getValue(), 12);
+        else
+            v = slider.getTextFromValue (slider.getValue());
+        label.setColour (juce::Label::textColourId, theme::text);
+        label.setText (v, juce::dontSendNotification);
+    }
+
+    juce::String name;
+    bool showingValue = false;
+    juce::RangedAudioParameter* param = nullptr;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
 };
 
