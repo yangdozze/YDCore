@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""YD Core factory preset generator.
+"""GLOBUS factory preset generator (Ninth Parallel Audio).
 
-Writes Presets/*.json. Each preset stores only the parameters that differ from
-the plugin's built-in defaults (the loader resets to defaults first).
+Writes Presets/*.json plus Presets/factory_bundle.json. Each preset stores only
+the parameters that differ from the plugin's built-in defaults (the loader
+resets to defaults first).
 
 Parameter IDs and choice indices MUST match Source/Parameters.cpp.
 """
 import json, os, re, sys
+
+AUTHOR = "Ninth Parallel Audio"
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "Presets")
 
@@ -413,6 +416,61 @@ P["Glitch Bloom"] = ("Experimental", {
     **fx(dist={"Drive": 0.4, "Tone": 5000, "Mix": 0.5}, dly={"Sync": 1, "Div": D16, "Feedback": 0.45, "Mix": 0.3}),
 })
 
+# ============================== descriptions ==============================
+DESC = {
+    "Dark Pressure":  "Heavy mono bass with a squashed LP24 bite and sub support.",
+    "Rust Bass":      "Corroded pulse-and-saw bass driven through gritty distortion.",
+    "Night Driver":   "Supersaw synthwave bass with a tight filter envelope snap.",
+    "Low Orbit":      "Round triangle bass slowly breathing through the filter.",
+    "Concrete Bass":  "Industrial square stack with a hard fifth and drive.",
+    "Toxic Mono":     "Acidic legato bass with S&H cutoff jitter and drive.",
+    "Sub Voltage":    "Pure sine-plus-square sub for maximum low end.",
+    "Chrome 808":     "808-style knock: pitch-dropped sine with long decay.",
+    "Deep Floor":     "Soft sine sub with a hint of triangle body.",
+    "Round Cellar":   "Warm triangle sub with slow filter movement.",
+    "Neon Bite":      "Bright supersaw lead with vibrato, delay and shimmer.",
+    "Cold Razor":     "Cutting square/saw mono lead with tempo-locked echoes.",
+    "Digital Cry":    "PWM lead with a pitch-drop attack and triplet delay.",
+    "Broken Signal":  "Glitchy S&H-modulated lead with distorted edges.",
+    "Blue Flame":     "Legato solo lead with expressive glide and mod-wheel cutoff.",
+    "Acid Skyline":   "Screaming 303-style resonant mono line with drive.",
+    "Glass Steps":    "Bell-like sine/triangle pluck with airy echoes.",
+    "Metro Pluck":    "Punchy filtered saw pluck for tight sequences.",
+    "Crystal Wire":   "Glassy pulse pluck with sparkle chorus.",
+    "Soft Attack":    "Gentle triangle pluck with a velvet room tail.",
+    "Arcade Dust":    "Chippy 8-bit style square pluck with grit.",
+    "Velvet Pulse":   "Smooth PWM pluck with a slow-breathing width.",
+    "Analog Room":    "Classic saw/square poly keys with warm chorus.",
+    "Soft Machine":   "Mellow triangle keys with wide slow chorus.",
+    "Dusty Digital":  "Lo-fi drifting keys with pink-noise air.",
+    "Plastic Piano":  "Percussive velocity-sensitive digital keys.",
+    "Minor Lights":   "Detuned unison keys with echo and hall.",
+    "Empty Room":     "Slow supersaw pad drifting in a large hall.",
+    "Frozen Cinema":  "Widescreen cinematic pad with glacial filter sweep.",
+    "Slow Horizon":   "Layered fifth pad with long attack and echoes.",
+    "Violet Air":     "Hollow band-pass pad with breathing pulse width.",
+    "Wide Memory":    "Double supersaw pad stretched across the stereo field.",
+    "Dark Cloud":     "Low ominous pad with pink-noise haze.",
+    "Deep Field":     "Sparse sine layers echoing into deep space.",
+    "Cold Static":    "Filtered noise-bed texture with slow sweeps.",
+    "Night Swarm":    "Detuned seven-voice cluster with random pitch drift.",
+    "Hollow Earth":   "Subterranean drone with slow filter breathing.",
+    "Night Grid":     "Two-octave 1/16 arpeggio with synced echoes.",
+    "Fast Orbit":     "Three-octave up/down arpeggio at high energy.",
+    "Electric Rain":  "Random 1/8 arpeggio with S&H sparkle.",
+    "Pulse Sequence": "Driving 1/8 arp with sub weight and drive.",
+    "Shadow Steps":   "Descending minor-mood arpeggio with echo trails.",
+    "Reverse Space":  "Swelling reverse-style riser into a huge wash.",
+    "Signal Fall":    "Falling pitch effect with gated tremolo.",
+    "Ghost Motion":   "Haunted band-pass noise drifting slowly.",
+    "Broken Radio":   "Detuned static transmission with chopper AM.",
+    "Deep Impact":    "Cinematic sub drop with noise rumble.",
+    "Fold Machine":   "Aggressive folded squares with S&H pulse width.",
+    "Random Walk":    "Melodic S&H pitch wander with dub echoes.",
+    "Metal Garden":   "Inharmonic metallic clangs with resonant ring.",
+    "Glitch Bloom":   "Hyperactive 1/32 random arp with bitcrush-like grit.",
+}
+
 # ============================== write ==============================
 def main():
     os.makedirs(OUT, exist_ok=True)
@@ -421,9 +479,12 @@ def main():
             os.remove(os.path.join(OUT, f))
     cats = {}
     bundle = []
+    missing_desc = [n for n in P if n not in DESC]
+    assert not missing_desc, f"presets missing descriptions: {missing_desc}"
     for name, (cat, params) in P.items():
         cats.setdefault(cat, []).append(name)
-        doc = {"name": name, "category": cat, "author": "Yangdozze", "format": "YDCore-1",
+        doc = {"name": name, "category": cat, "author": AUTHOR,
+               "description": DESC[name], "format": "YDCore-1",
                "params": {k: (round(v, 6) if isinstance(v, float) else v) for k, v in sorted(params.items())}}
         bundle.append(doc)
         safe = re.sub(r"[^A-Za-z0-9]+", "_", name)
