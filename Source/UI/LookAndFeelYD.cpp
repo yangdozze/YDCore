@@ -114,9 +114,23 @@ void LookAndFeelYD::drawLinearSlider (juce::Graphics& g, int x, int y, int w, in
         g.setColour (theme::track);
         g.fillRoundedRectangle (track, 2.0f);
 
+        // bipolar ranges fill from their zero point, unipolar from the start
+        const bool bipolar = slider.getMinimum() < 0.0 && slider.getMaximum() > 0.0;
         auto filled = track;
-        if (horizontal) filled = filled.withWidth (sliderPos - (float) x);
-        else            filled = filled.withTop (sliderPos);
+        if (horizontal)
+        {
+            if (bipolar)
+            {
+                const float zeroX = (float) x + (float) w
+                                  * (float) ((0.0 - slider.getMinimum()) / (slider.getMaximum() - slider.getMinimum()));
+                filled = juce::Rectangle<float> (juce::jmin (zeroX, sliderPos), track.getY(),
+                                                 std::abs (sliderPos - zeroX), track.getHeight());
+            }
+            else
+                filled = filled.withWidth (sliderPos - (float) x);
+        }
+        else
+            filled = filled.withTop (sliderPos);
         g.setColour (theme::accent.withAlpha (0.8f));
         g.fillRoundedRectangle (filled, 2.0f);
 
