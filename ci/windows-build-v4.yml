@@ -1,0 +1,177 @@
+name: Windows Build v4 (GLOBUS + Installer)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows x64 (build, test, installer)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (MSVC x64)
+        shell: pwsh
+        run: |
+          cmake --version | Tee-Object -FilePath configure.log
+          cmake -B build -G "Visual Studio 17 2022" -A x64 2>&1 | Tee-Object -Append -FilePath configure.log
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "VS 2022 generator unavailable or failed - retrying with the runner default generator"
+            Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
+            cmake -B build -A x64 2>&1 | Tee-Object -Append -FilePath configure.log
+          }
+          exit $LASTEXITCODE
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel 2>&1 | Tee-Object -FilePath build.log
+          exit $LASTEXITCODE
+
+      - name: Run headless verification suite
+        shell: pwsh
+        run: |
+          & "build/YDCoreTests_artefacts/Release/YDCoreTests.exe" 2>&1 | Tee-Object -FilePath tests.log
+          exit $LASTEXITCODE
+
+      - name: Generate installer artwork
+        shell: pwsh
+        run: |
+          python -m pip install --quiet pillow
+          python tools/gen_installer_assets.py
+
+      - name: Compile installer (Inno Setup)
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\GLOBUS-Installer.iss" 2>&1 | Tee-Object -FilePath iscc.log
+          exit $LASTEXITCODE
+
+      - name: Test installer (silent install, verify, uninstall)
+        shell: pwsh
+        run: |
+          $log = "installer-test.log"
+          $script:fails = 0
+          function Check($name, $cond) {
+            $status = if ($cond) { "[OK]" } else { "[FAIL]" }
+            "$status $name" | Tee-Object -FilePath $log -Append
+            if (-not $cond) { $script:fails++ }
+          }
+
+          # ---- silent install
+          $p = Start-Process -FilePath "installer\Output\GLOBUS-Installer-Windows-x64.exe" `
+                -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/LOG=install.log" -Wait -PassThru
+          Check "silent install exit code 0" ($p.ExitCode -eq 0)
+
+          $vst3 = "C:\Program Files\Common Files\VST3\GLOBUS.vst3\Contents\x86_64-win\GLOBUS.vst3"
+          $mod  = "C:\Program Files\Common Files\VST3\GLOBUS.vst3\Contents\Resources\moduleinfo.json"
+          $sa   = "C:\Program Files\Ninth Parallel Audio\GLOBUS\GLOBUS.exe"
+          Check "VST3 module installed to Common Files\VST3" (Test-Path $vst3)
+          Check "VST3 moduleinfo.json installed" (Test-Path $mod)
+          Check "Standalone installed" (Test-Path $sa)
+
+          # installed VST3 is byte-identical to the freshly built one
+          $h1 = (Get-FileHash "build/YDCore_artefacts/Release/VST3/GLOBUS.vst3/Contents/x86_64-win/GLOBUS.vst3").Hash
+          $h2 = (Get-FileHash $vst3).Hash
+          Check "installed VST3 hash matches build" ($h1 -eq $h2)
+
+          # vendor branding present in the installed plugin metadata
+          $vendorOk = (Get-Content $mod -Raw) -match "Ninth Parallel Audio"
+          Check "installed moduleinfo carries Ninth Parallel Audio vendor" $vendorOk
+
+          # standalone launches and stays alive
+          $proc = Start-Process -FilePath $sa -PassThru
+          Start-Sleep -Seconds 8
+          Check "Standalone launches and keeps running" (-not $proc.HasExited)
+          if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+
+          # user presets must survive uninstall
+          $presetDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "GLOBUS\Presets"
+          New-Item -ItemType Directory -Force -Path $presetDir | Out-Null
+          '{"name":"CI Survival","category":"User","params":{}}' | Out-File "$presetDir\CI_Survival.json" -Encoding utf8
+          $legacyDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "YDCore\Presets"
+          New-Item -ItemType Directory -Force -Path $legacyDir | Out-Null
+          '{"name":"Legacy Survival","category":"User","params":{}}' | Out-File "$legacyDir\Legacy_Survival.json" -Encoding utf8
+
+          # ---- silent uninstall
+          $unins = Get-ChildItem "C:\Program Files\Ninth Parallel Audio\GLOBUS\unins*.exe" | Select-Object -First 1
+          Check "uninstaller registered in app folder" ($null -ne $unins)
+          if ($null -ne $unins) {
+            $p2 = Start-Process -FilePath $unins.FullName -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -Wait -PassThru
+            Check "silent uninstall exit code 0" ($p2.ExitCode -eq 0)
+            Start-Sleep -Seconds 6
+            Check "VST3 bundle removed on uninstall" (-not (Test-Path "C:\Program Files\Common Files\VST3\GLOBUS.vst3"))
+            Check "Standalone exe removed on uninstall" (-not (Test-Path $sa))
+            Check "GLOBUS user presets survive uninstall" (Test-Path "$presetDir\CI_Survival.json")
+            Check "legacy YDCore presets survive uninstall" (Test-Path "$legacyDir\Legacy_Survival.json")
+          }
+
+          Write-Host "----- installer test summary -----"
+          Get-Content $log
+          if ($script:fails -gt 0) { exit 1 }
+
+      - name: Package artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "build/YDCore_artefacts/Release/VST3/GLOBUS.vst3" -DestinationPath "dist/GLOBUS-VST3-Windows-x64.zip"
+          Compress-Archive -Path "build/YDCore_artefacts/Release/Standalone/GLOBUS.exe" -DestinationPath "dist/GLOBUS-Standalone-Windows-x64.zip"
+          Copy-Item "installer/Output/GLOBUS-Installer-Windows-x64.exe" "dist/"
+          Get-ChildItem dist
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLOBUS-VST3-Windows-x64
+          path: dist/GLOBUS-VST3-Windows-x64.zip
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLOBUS-Standalone-Windows-x64
+          path: dist/GLOBUS-Standalone-Windows-x64.zip
+
+      - name: Upload Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLOBUS-Installer-Windows-x64
+          path: dist/GLOBUS-Installer-Windows-x64.exe
+
+      - name: Publish binaries to the rolling release
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ci-latest --yes --cleanup-tag 2>$null
+          if ($LASTEXITCODE -ne 0) { Write-Host "no previous ci-latest release" }
+          gh release create ci-latest `
+            "dist/GLOBUS-Installer-Windows-x64.exe" `
+            "dist/GLOBUS-VST3-Windows-x64.zip" `
+            "dist/GLOBUS-Standalone-Windows-x64.zip" `
+            --title "GLOBUS 1.1.0 - Windows x64 (CI build)" `
+            --notes "Automated Windows x64 Release build by Ninth Parallel Audio. Easiest install: run GLOBUS-Installer-Windows-x64.exe (installs the VST3 to Common Files\VST3 and the Standalone app, with Start Menu shortcut and uninstaller; user presets are never touched). Manual install: unzip GLOBUS-VST3-Windows-x64.zip and copy 'GLOBUS.vst3' to C:\Program Files\Common Files\VST3, then rescan plugins in FL Studio. Commit ${{ github.sha }}."
+          exit 0
+
+      - name: Publish debug logs on failure
+        if: failure()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ci-debug --yes --cleanup-tag 2>$null
+          if ($LASTEXITCODE -ne 0) { Write-Host "no previous ci-debug release" }
+          $files = @()
+          foreach ($f in @("configure.log", "build.log", "tests.log", "iscc.log", "install.log", "installer-test.log")) {
+            if (Test-Path $f) { $files += $f }
+          }
+          if ($files.Count -eq 0) { "no logs captured" | Out-File nolog.txt; $files = @("nolog.txt") }
+          gh release create ci-debug @files --prerelease `
+            --title "CI debug logs (run ${{ github.run_id }})" `
+            --notes "Logs from the failed Windows build of commit ${{ github.sha }}."
+          exit 0
