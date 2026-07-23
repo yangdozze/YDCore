@@ -1,0 +1,22 @@
+# Build output
+build/
+build-*/
+cmake-build-*/
+out/
+
+# Local JUCE checkout (CI fetches the pinned tag via FetchContent)
+libs/JUCE/
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+*.user
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
