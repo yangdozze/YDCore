@@ -1,4 +1,4 @@
-// YD Core — one polyphonic voice: 2 osc units + sub + noise → multimode filter
+// GLOBUS — one polyphonic voice: 2 osc units + sub + noise → multimode filter
 // → amp envelope. All modulation evaluated at control rate (32 samples).
 #pragma once
 #include "DspUtils.h"
