@@ -1,4 +1,4 @@
-// YD Core — parameter contract. Every ID here is stable and host-automatable.
+// GLOBUS — parameter contract. Every ID here is stable and host-automatable.
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
