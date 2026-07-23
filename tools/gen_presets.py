@@ -420,15 +420,21 @@ def main():
         if f.endswith(".json"):
             os.remove(os.path.join(OUT, f))
     cats = {}
+    bundle = []
     for name, (cat, params) in P.items():
         cats.setdefault(cat, []).append(name)
         doc = {"name": name, "category": cat, "author": "Yangdozze", "format": "YDCore-1",
                "params": {k: (round(v, 6) if isinstance(v, float) else v) for k, v in sorted(params.items())}}
+        bundle.append(doc)
         safe = re.sub(r"[^A-Za-z0-9]+", "_", name)
         with open(os.path.join(OUT, f"{safe}.json"), "w") as fh:
             json.dump(doc, fh, indent=1)
+    # single-file bundle: lets a fresh checkout build with zero interpreter deps
+    # (CMake splits it at configure time when the individual files are absent)
+    with open(os.path.join(OUT, "factory_bundle.json"), "w") as fh:
+        json.dump(bundle, fh, indent=1)
     total = len(P)
-    print(f"Wrote {total} presets:")
+    print(f"Wrote {total} presets (+ factory_bundle.json):")
     for c in ["Bass", "Sub Bass", "Lead", "Pluck", "Keys", "Pad", "Atmosphere", "Arpeggio", "FX", "Experimental"]:
         print(f"  {c}: {len(cats.get(c, []))}")
     assert total >= 40, "need at least 40 presets"
