@@ -49,7 +49,22 @@ jobs:
       - name: Compile installer (Inno Setup)
         shell: pwsh
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\GLOBUS-Installer.iss" 2>&1 | Tee-Object -FilePath iscc.log
+          "locating Inno Setup..." | Tee-Object -FilePath iscc.log
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            "Inno Setup not preinstalled - installing via chocolatey" | Tee-Object -Append -FilePath iscc.log
+            choco install innosetup -y --no-progress 2>&1 | Select-Object -Last 5 | Tee-Object -Append -FilePath iscc.log
+          }
+          if (-not (Test-Path $iscc)) {
+            $shim = Get-Command iscc -ErrorAction SilentlyContinue
+            if ($null -ne $shim) { $iscc = $shim.Source }
+          }
+          "using: $iscc" | Tee-Object -Append -FilePath iscc.log
+          if (-not (Test-Path $iscc)) {
+            "FATAL: ISCC.exe not found after install" | Tee-Object -Append -FilePath iscc.log
+            exit 1
+          }
+          & $iscc "installer\GLOBUS-Installer.iss" 2>&1 | Tee-Object -Append -FilePath iscc.log
           exit $LASTEXITCODE
 
       - name: Test installer (silent install, verify, uninstall)
