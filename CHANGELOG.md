@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.1.0 — 2026-07-23 — "GLOBUS"
+
+Rebrand + interface generation 2.
+
+- **New identity:** the synthesizer is now **GLOBUS** by **Ninth Parallel
+  Audio** (plugin name, vendor, bundle ID, UI, presets, docs, artifacts).
+  Plugin 4-char codes and state format unchanged — existing projects and
+  saved sounds load as before.
+- **Tabbed interface:** five real pages — OSC, FX, MATRIX, GLOBAL, PRESETS —
+  behind a persistent top bar (preset navigation, Save/Init/Random, MIDI LED,
+  CPU, voice count, stereo output meter).
+- **Live oscillator waveform displays** driven by the actual wave/PW/unison
+  parameters; larger two-row oscillator layout.
+- **Modulation matrix page:** numbered slots with live activity indicators and
+  editable amount value boxes; bipolar sliders now fill from centre.
+- **Global page:** play controls, arpeggiator, output and a live status panel
+  (MIDI input, sustain pedal, CPU and voice meters).
+- **Preset bank:** three-column browser — sources & categories, searchable
+  list with favorites and keyboard navigation (↑/↓, Enter, Esc), info panel
+  with author & description, Load / Delete / Init / Random / Save As.
+- **Preset metadata:** all 51 factory presets carry author and description
+  fields. User presets move to Documents/GLOBUS/Presets (legacy YDCore folder
+  still read; favorites migrate automatically).
+- Knob value readouts on hover/drag; polished hover/pressed states throughout.
+- Output metering added to the processor (lock-free).
+- Verification suite extended to 430+ checks incl. brand metadata and
+  per-tab screenshot capture (`--screenshots <dir>`).
+
 ## 1.0.0 — 2026-07-23
 
 Initial release.
