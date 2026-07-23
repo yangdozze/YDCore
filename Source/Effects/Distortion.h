@@ -1,4 +1,4 @@
-// YD Core — distortion: tanh waveshaper → one-pole tone LP → dry/wet.
+// GLOBUS — distortion: tanh waveshaper → one-pole tone LP → dry/wet.
 #pragma once
 #include "../Engine/DspUtils.h"
 
