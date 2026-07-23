@@ -1,4 +1,4 @@
-// YD Core — stereo delay with tempo sync, slewed time changes (no pitch chaos),
+// GLOBUS — stereo delay with tempo sync, slewed time changes (no pitch chaos),
 // and a low-pass filter inside the feedback loop.
 #pragma once
 #include <vector>
