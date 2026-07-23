@@ -1,6 +1,7 @@
-// YD Core — oscillator, sub & noise section components.
+// GLOBUS — oscillator, sub & noise section components (OSC tab).
 #pragma once
 #include "Controls.h"
+#include "WaveformDisplay.h"
 
 namespace ydc
 {
@@ -13,7 +14,8 @@ public:
           on ("ON"), wave ("", false),
           oct ("OCT"), semi ("SEMI"), fine ("FINE"), level ("LEVEL"), pan ("PAN"), pw ("PW"),
           uni ("UNISON"), det ("DETUNE"), spread ("SPREAD"), drift ("DRIFT"), phase ("PHASE"),
-          randPhase ("RND PH")
+          randPhase ("RND PH"),
+          display (apvts, oscNum, oscNum == 1 ? theme::accent : theme::accent2)
     {
         const auto accent = oscNum == 1 ? theme::accent : theme::accent2;
         for (Knob* k : { &oct, &semi, &fine, &level, &pan, &pw, &uni, &det, &spread, &drift, &phase })
@@ -24,6 +26,7 @@ public:
         addAndMakeVisible (on);
         addAndMakeVisible (wave);
         addAndMakeVisible (randPhase);
+        addAndMakeVisible (display);
 
         on.attach (apvts, ids::osc (oscNum, "On"));
         wave.attach (apvts, ids::osc (oscNum, "Wave"));
@@ -44,15 +47,27 @@ public:
     void resized() override
     {
         auto c = content();
-        // header row (next to the panel title)
+        // header row next to the title
         on.setBounds (150, 3, 52, 20);
-        wave.setBounds (205, 3, 110, 20);
-        randPhase.setBounds (322, 3, 70, 20);
+        wave.setBounds (206, 3, 116, 20);
+        randPhase.setBounds (330, 3, 72, 20);
 
-        auto cells = rowCells (c.withTrimmedTop (6), 11, 3);
-        Knob* knobs[] = { &oct, &semi, &fine, &level, &pan, &pw, &uni, &det, &spread, &drift, &phase };
-        for (size_t i = 0; i < 11; ++i)
-            knobs[i]->setBounds (cells[i]);
+        auto body = c.withTrimmedTop (4);
+        display.setBounds (body.removeFromRight (158));
+        body.removeFromRight (6);
+
+        const int rowH = body.getHeight() / 2;
+        auto row1 = body.removeFromTop (rowH);
+        auto row2 = body;
+
+        Knob* top[]    = { &oct, &semi, &fine, &level, &pan, &pw };
+        Knob* bottom[] = { &uni, &det, &spread, &drift, &phase };
+        auto cells1 = rowCells (row1, 6, 4);
+        for (size_t i = 0; i < 6; ++i)
+            top[i]->setBounds (cells1[i]);
+        auto cells2 = rowCells (row2, 6, 4);   // 6 cells keeps columns aligned; last stays empty
+        for (size_t i = 0; i < 5; ++i)
+            bottom[i]->setBounds (cells2[i]);
     }
 
 private:
@@ -60,6 +75,7 @@ private:
     Selector wave;
     Knob oct, semi, fine, level, pan, pw, uni, det, spread, drift, phase;
     Toggle randPhase;
+    WaveformDisplay display;
 };
 
 //==============================================================================
@@ -99,15 +115,15 @@ public:
     void resized() override
     {
         auto c = content();
-        const int knobW = 56;
+        const int knobW = 58;
         subOn.setBounds (c.getX(), c.getCentreY() - 10, 54, 20);
         subWave.setBounds (c.getX() + 58, c.getCentreY() - 11, 84, 22);
-        subLevel.setBounds (c.getX() + 150, c.getY(), knobW, c.getHeight());
+        subLevel.setBounds (c.getX() + 152, c.getY(), knobW, c.getHeight());
 
         const int nx = c.getCentreX() - 16;
         noiseType.setBounds (nx, c.getCentreY() - 11, 84, 22);
         noiseLevel.setBounds (nx + 92, c.getY(), knobW, c.getHeight());
-        noiseTone.setBounds (nx + 92 + knobW + 6, c.getY(), knobW, c.getHeight());
+        noiseTone.setBounds (nx + 92 + knobW + 8, c.getY(), knobW, c.getHeight());
     }
 
 private:
