@@ -1,4 +1,4 @@
-// YD Core — reverb (JUCE algorithmic reverb wrapped with our parameter set).
+// GLOBUS — reverb (JUCE algorithmic reverb wrapped with our parameter set).
 #pragma once
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "../Engine/DspUtils.h"
