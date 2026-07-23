@@ -1,4 +1,4 @@
-// YD Core — multimode TPT state-variable filter (Zavalishin), 12/24 dB, stereo.
+// GLOBUS — multimode TPT state-variable filter (Zavalishin), 12/24 dB, stereo.
 #pragma once
 #include "DspUtils.h"
 #include "../Parameters.h"
