@@ -1,4 +1,4 @@
-// YD Core — LFO with tempo sync, fade-in, retrigger and S&H. Used per-voice
+// GLOBUS — LFO with tempo sync, fade-in, retrigger and S&H. Used per-voice
 // (retrigger mode) and as engine-global master (free-running mode).
 #pragma once
 #include "DspUtils.h"
