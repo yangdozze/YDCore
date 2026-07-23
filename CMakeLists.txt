@@ -32,21 +32,31 @@ endif()
 
 # ------------------------------------------------------------------------------
 # Factory presets embedded into the binary (also shipped as portable JSON).
-# If the Presets folder is empty (fresh checkout), generate them from the
-# canonical generator script.
+# A fresh checkout carries Presets/factory_bundle.json; when the individual
+# preset files are absent, pure CMake splits the bundle at configure time
+# (no Python or other interpreter required).
 # ------------------------------------------------------------------------------
 file(GLOB YDCORE_PRESET_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Presets/*.json")
+list(FILTER YDCORE_PRESET_FILES EXCLUDE REGEX "factory_bundle\\.json$")
 if(NOT YDCORE_PRESET_FILES)
-    find_package(Python3 COMPONENTS Interpreter REQUIRED)
-    message(STATUS "YD Core: generating factory presets via tools/gen_presets.py")
-    execute_process(
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_presets.py"
-        RESULT_VARIABLE YDCORE_GEN_RESULT)
-    if(NOT YDCORE_GEN_RESULT EQUAL 0)
-        message(FATAL_ERROR "YD Core: preset generation failed (${YDCORE_GEN_RESULT})")
+    set(YDCORE_BUNDLE "${CMAKE_CURRENT_SOURCE_DIR}/Presets/factory_bundle.json")
+    if(NOT EXISTS "${YDCORE_BUNDLE}")
+        message(FATAL_ERROR "YD Core: no presets found (need Presets/*.json or Presets/factory_bundle.json — run tools/gen_presets.py)")
     endif()
+    message(STATUS "YD Core: splitting factory preset bundle")
+    file(READ "${YDCORE_BUNDLE}" YDCORE_BUNDLE_JSON)
+    string(JSON YDCORE_PRESET_COUNT_RAW LENGTH "${YDCORE_BUNDLE_JSON}")
+    math(EXPR YDCORE_LAST "${YDCORE_PRESET_COUNT_RAW} - 1")
+    set(YDCORE_PRESET_OUT "${CMAKE_CURRENT_BINARY_DIR}/FactoryPresets")
+    file(MAKE_DIRECTORY "${YDCORE_PRESET_OUT}")
+    foreach(YDCORE_I RANGE ${YDCORE_LAST})
+        string(JSON YDCORE_ONE GET "${YDCORE_BUNDLE_JSON}" ${YDCORE_I})
+        string(JSON YDCORE_NAME GET "${YDCORE_ONE}" name)
+        string(MAKE_C_IDENTIFIER "${YDCORE_NAME}" YDCORE_SAFE)
+        file(WRITE "${YDCORE_PRESET_OUT}/${YDCORE_SAFE}.json" "${YDCORE_ONE}")
+    endforeach()
+    file(GLOB YDCORE_PRESET_FILES "${YDCORE_PRESET_OUT}/*.json")
 endif()
-file(GLOB YDCORE_PRESET_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Presets/*.json")
 list(LENGTH YDCORE_PRESET_FILES YDCORE_PRESET_COUNT)
 message(STATUS "YD Core: embedding ${YDCORE_PRESET_COUNT} factory presets")
 juce_add_binary_data(YDCorePresetData SOURCES ${YDCORE_PRESET_FILES})
