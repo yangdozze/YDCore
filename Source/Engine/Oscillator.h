@@ -1,4 +1,4 @@
-// YD Core — band-limited oscillator unit with unison, supersaw and analog drift.
+// GLOBUS — band-limited oscillator unit with unison, supersaw and analog drift.
 #pragma once
 #include "DspUtils.h"
 #include "../Parameters.h"
