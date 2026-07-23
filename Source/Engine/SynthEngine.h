@@ -1,4 +1,4 @@
-// YD Core — 32-voice engine: voice allocation, play modes, sustain pedal,
+// GLOBUS — 32-voice engine: voice allocation, play modes, sustain pedal,
 // click-free stealing, global modulation and master LFO clocking.
 #pragma once
 #include <juce_audio_basics/juce_audio_basics.h>
