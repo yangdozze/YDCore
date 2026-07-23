@@ -71,6 +71,14 @@ void YDCoreAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     engine.process (buffer, arpBuffer, bpm, refs);
     fx.process (buffer, refs, bpm, engine.getFxMixScale(), engine.getStereoWidthMod());
 
+    // lock-free output metering for the UI (peak-hold, cleared on UI read)
+    for (int c = 0; c < juce::jmin (2, buffer.getNumChannels()); ++c)
+    {
+        const float mag = buffer.getMagnitude (c, 0, numSamples);
+        float prev = outPeak[c].load (std::memory_order_relaxed);
+        while (mag > prev && ! outPeak[c].compare_exchange_weak (prev, mag, std::memory_order_relaxed)) {}
+    }
+
     midiMessages.clear();
 }
 
