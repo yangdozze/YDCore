@@ -1,4 +1,4 @@
-// YD Core — master FX chain: Distortion → Chorus → Delay → Reverb → EQ,
+// GLOBUS — master FX chain: Distortion → Chorus → Delay → Reverb → EQ,
 // then stereo width, master gain and a safety soft-clip.
 // Every effect bypasses through a ~10 ms crossfade (no clicks).
 #pragma once
