@@ -1,4 +1,4 @@
-// YD Core — small audio-thread-safe DSP helpers. Header-only, no allocations.
+// GLOBUS — small audio-thread-safe DSP helpers. Header-only, no allocations.
 #pragma once
 #include <cmath>
 #include <cstdint>
