@@ -27,6 +27,12 @@ Rebrand + interface generation 2.
 - Output metering added to the processor (lock-free).
 - Verification suite extended to 430+ checks incl. brand metadata and
   per-tab screenshot capture (`--screenshots <dir>`).
+- **Windows installer**: dark-themed Inno Setup wizard
+  (`GLOBUS-Installer-Windows-x64.exe`) with original globe artwork and icon,
+  selectable VST3/Standalone components, Start Menu + optional Desktop
+  shortcuts, optional launch-after-install, in-place upgrades, proper
+  uninstaller — user presets (including legacy YDCore folders) are never
+  touched. Compiled and silently install/verify/uninstall-tested on CI.
 
 ## 1.0.0 — 2026-07-23
 
