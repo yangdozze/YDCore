@@ -1,4 +1,4 @@
-// YD Core — 3-band output EQ: low shelf 120 Hz, mid peak 1 kHz, high shelf 8 kHz.
+// GLOBUS — 3-band output EQ: low shelf 120 Hz, mid peak 1 kHz, high shelf 8 kHz.
 #pragma once
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "../Engine/DspUtils.h"
