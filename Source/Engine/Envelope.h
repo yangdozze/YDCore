@@ -1,4 +1,4 @@
-// YD Core — analog-style exponential ADSR. Click-free: attack resumes from the
+// GLOBUS — analog-style exponential ADSR. Click-free: attack resumes from the
 // current level, voice stealing uses a ~3 ms fast release.
 #pragma once
 #include "DspUtils.h"
