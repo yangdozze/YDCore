@@ -1,4 +1,4 @@
-// YD Core — live ADSR visualisation. Repaints (30 Hz, dirty-flagged) whenever
+// GLOBUS — live ADSR visualisation. Repaints (30 Hz, dirty-flagged) whenever
 // its four parameters move — from the UI, host automation or preset loads.
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
