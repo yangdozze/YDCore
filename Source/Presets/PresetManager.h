@@ -1,6 +1,7 @@
-// YD Core — preset system. Factory presets are embedded JSON (BinaryData) and
-// also shipped as portable .json files; user presets live in
-// Documents/YDCore/Presets. All calls are message-thread only.
+// GLOBUS — preset system (Ninth Parallel Audio). Factory presets are embedded
+// JSON (BinaryData) and also shipped as portable .json files; user presets
+// live in Documents/GLOBUS/Presets (the legacy YDCore folder is still read).
+// All calls are message-thread only.
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -15,6 +16,8 @@ public:
     {
         juce::String name;
         juce::String category;
+        juce::String author;
+        juce::String description;
         bool isFactory = false;
         int binaryIndex = -1;     // factory: index into BinaryData
         juce::File file;          // user preset file
@@ -45,6 +48,7 @@ public:
     void setCurrentInfo (const juce::String& name, const juce::String& category);
 
     static juce::File userPresetDirectory();
+    static juce::File legacyUserPresetDirectory();
 
 private:
     bool applyPresetJson (const juce::var& root);
