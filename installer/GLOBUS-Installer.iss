@@ -105,16 +105,15 @@ const
   ColText    = $E4DCD8;  // #D8DCE4 text
   ColDim     = $A4938A;  // #8A93A4 dim text
   ColBlue    = $FFA34D;  // #4DA3FF accent
-  ColViolet  = $F87C8B;  // #8B7CF8 accent 2
 
 var
   FooterLabel: TNewStaticText;
   AccentBar: TPanel;
 
-procedure StyleStaticText(L: TNewStaticText; Col: TColor);
+procedure StyleLabel(L: TNewStaticText; FontCol, BackCol: TColor);
 begin
-  L.Font.Color := Col;
-  L.Transparent := True;
+  L.Font.Color := FontCol;
+  L.Color := BackCol;
 end;
 
 procedure InitializeWizard;
@@ -131,10 +130,14 @@ begin
   WizardForm.InstallingPage.Color := ColBg;
   WizardForm.FinishedPage.Color := ColBg;
 
+  // hide the light bevel lines; the accent bar replaces them
+  WizardForm.Bevel.Visible := False;
+  WizardForm.Bevel1.Visible := False;
+
   // ---- header strip (inner pages)
   WizardForm.MainPanel.Color := ColPanel;
-  WizardForm.PageNameLabel.Font.Color := ColText;
-  WizardForm.PageDescriptionLabel.Font.Color := ColDim;
+  StyleLabel(WizardForm.PageNameLabel, ColText, ColPanel);
+  StyleLabel(WizardForm.PageDescriptionLabel, ColDim, ColPanel);
 
   // thin accent bar under the header
   AccentBar := TPanel.Create(WizardForm);
@@ -148,73 +151,61 @@ begin
   AccentBar.Anchors := [akLeft, akRight, akBottom];
 
   // ---- welcome / finished pages
-  WizardForm.WelcomeLabel1.Font.Color := ColText;
+  StyleLabel(WizardForm.WelcomeLabel1, ColText, ColBg);
   WizardForm.WelcomeLabel1.Font.Size := 13;
   WizardForm.WelcomeLabel1.Font.Style := [fsBold];
-  WizardForm.WelcomeLabel1.Transparent := True;
-  WizardForm.WelcomeLabel2.Font.Color := ColDim;
-  WizardForm.WelcomeLabel2.Transparent := True;
-  WizardForm.FinishedHeadingLabel.Font.Color := ColText;
+  StyleLabel(WizardForm.WelcomeLabel2, ColDim, ColBg);
+  StyleLabel(WizardForm.FinishedHeadingLabel, ColText, ColBg);
   WizardForm.FinishedHeadingLabel.Font.Size := 13;
   WizardForm.FinishedHeadingLabel.Font.Style := [fsBold];
-  WizardForm.FinishedHeadingLabel.Transparent := True;
-  WizardForm.FinishedLabel.Font.Color := ColDim;
-  WizardForm.FinishedLabel.Transparent := True;
+  StyleLabel(WizardForm.FinishedLabel, ColDim, ColBg);
   WizardForm.RunList.Color := ColBg;
   WizardForm.RunList.Font.Color := ColText;
 
   // ---- license page
-  WizardForm.LicenseLabel1.Font.Color := ColDim;
-  WizardForm.LicenseLabel1.Transparent := True;
+  StyleLabel(WizardForm.LicenseLabel1, ColDim, ColBg);
   WizardForm.LicenseMemo.Color := ColInput;
   WizardForm.LicenseMemo.Font.Color := ColText;
+  WizardForm.LicenseAcceptedRadio.Color := ColBg;
   WizardForm.LicenseAcceptedRadio.Font.Color := ColText;
+  WizardForm.LicenseNotAcceptedRadio.Color := ColBg;
   WizardForm.LicenseNotAcceptedRadio.Font.Color := ColDim;
 
   // ---- directory page
-  WizardForm.SelectDirLabel.Font.Color := ColText;
-  WizardForm.SelectDirLabel.Transparent := True;
-  WizardForm.SelectDirBrowseLabel.Font.Color := ColDim;
-  WizardForm.SelectDirBrowseLabel.Transparent := True;
+  StyleLabel(WizardForm.SelectDirLabel, ColText, ColBg);
+  StyleLabel(WizardForm.SelectDirBrowseLabel, ColDim, ColBg);
   WizardForm.DirEdit.Color := ColInput;
   WizardForm.DirEdit.Font.Color := ColText;
-  WizardForm.DiskSpaceLabel.Font.Color := ColDim;
-  WizardForm.DiskSpaceLabel.Transparent := True;
+  StyleLabel(WizardForm.DiskSpaceLabel, ColDim, ColBg);
 
   // ---- components page
-  WizardForm.SelectComponentsLabel.Font.Color := ColDim;
-  WizardForm.SelectComponentsLabel.Transparent := True;
+  StyleLabel(WizardForm.SelectComponentsLabel, ColDim, ColBg);
   WizardForm.TypesCombo.Color := ColInput;
   WizardForm.TypesCombo.Font.Color := ColText;
   WizardForm.ComponentsList.Color := ColBg;
   WizardForm.ComponentsList.Font.Color := ColText;
-  WizardForm.ComponentsDiskSpaceLabel.Font.Color := ColDim;
-  WizardForm.ComponentsDiskSpaceLabel.Transparent := True;
+  StyleLabel(WizardForm.ComponentsDiskSpaceLabel, ColDim, ColBg);
 
   // ---- tasks page
-  WizardForm.SelectTasksLabel.Font.Color := ColDim;
-  WizardForm.SelectTasksLabel.Transparent := True;
+  StyleLabel(WizardForm.SelectTasksLabel, ColDim, ColBg);
   WizardForm.TasksList.Color := ColBg;
   WizardForm.TasksList.Font.Color := ColText;
 
   // ---- ready page
-  WizardForm.ReadyLabel.Font.Color := ColText;
-  WizardForm.ReadyLabel.Transparent := True;
+  StyleLabel(WizardForm.ReadyLabel, ColText, ColBg);
   WizardForm.ReadyMemo.Color := ColInput;
   WizardForm.ReadyMemo.Font.Color := ColDim;
 
   // ---- installing page
-  WizardForm.StatusLabel.Font.Color := ColText;
-  WizardForm.StatusLabel.Transparent := True;
-  WizardForm.FilenameLabel.Font.Color := ColDim;
-  WizardForm.FilenameLabel.Transparent := True;
+  StyleLabel(WizardForm.StatusLabel, ColText, ColBg);
+  StyleLabel(WizardForm.FilenameLabel, ColDim, ColBg);
 
   // ---- footer: product identity next to the buttons
   FooterLabel := TNewStaticText.Create(WizardForm);
   FooterLabel.Parent := WizardForm;
-  FooterLabel.Caption := 'GLOBUS ' + '{#MyAppVersion}' + '  |  Ninth Parallel Audio';
+  FooterLabel.Caption := 'GLOBUS {#MyAppVersion}  |  Ninth Parallel Audio';
   FooterLabel.Font.Color := ColDim;
-  FooterLabel.Transparent := True;
+  FooterLabel.Color := ColBg;
   FooterLabel.Left := ScaleX(16);
   FooterLabel.Top := WizardForm.CancelButton.Top + ScaleY(4);
   FooterLabel.Anchors := [akLeft, akBottom];
@@ -234,7 +225,7 @@ begin
         'DisplayVersion', Prev) then
       MsgBox('GLOBUS ' + Prev + ' is already installed.' + #13#10 +
              'Setup will upgrade it to version {#MyAppVersion}.' + #13#10#13#10 +
-             'Your user presets and favorites are kept untouched.',
+             'Your user presets are kept untouched.',
              mbInformation, MB_OK);
   end;
 end;
