@@ -1,4 +1,4 @@
-// YD Core — filter, envelope, LFO and modulation-matrix section components.
+// GLOBUS — filter, envelope, LFO and modulation-matrix section components.
 #pragma once
 #include "Controls.h"
 #include "EnvelopeDisplay.h"
@@ -117,8 +117,8 @@ public:
     void resized() override
     {
         auto c = content().withTrimmedTop (2);
-        auto bottom = c.removeFromBottom (24);
-        dest.setBounds (bottom.removeFromLeft (118).withTrimmedTop (2));
+        auto bottom = c.removeFromBottom (juce::jmax (24, c.getHeight() * 32 / 100));
+        dest.setBounds (bottom.removeFromLeft (128).withSizeKeepingCentre (128, 24));
         bottom.removeFromLeft (6);
         display.setBounds (bottom);
 
@@ -202,69 +202,6 @@ private:
     Selector dest;
     Knob amount;
     Toggle sync, bipolar, retrig;
-};
-
-//==============================================================================
-class MatrixSection : public SectionPanel
-{
-public:
-    explicit MatrixSection (juce::AudioProcessorValueTreeState& apvts)
-        : SectionPanel ("MOD MATRIX", theme::accent2)
-    {
-        for (int i = 0; i < 8; ++i)
-        {
-            auto& row = rows[(size_t) i];
-            row.src  = std::make_unique<Selector> ("", false);
-            row.dst  = std::make_unique<Selector> ("", false);
-            row.amt  = std::make_unique<juce::Slider>();
-            row.bi   = std::make_unique<Toggle> ("BI");
-
-            row.amt->setSliderStyle (juce::Slider::LinearHorizontal);
-            row.amt->setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-            row.amt->setPopupDisplayEnabled (true, true, nullptr);
-
-            addAndMakeVisible (*row.src);
-            addAndMakeVisible (*row.dst);
-            addAndMakeVisible (*row.amt);
-            addAndMakeVisible (*row.bi);
-
-            const int n = i + 1;
-            row.src->attach (apvts, ids::slot (n, "Src"));
-            row.dst->attach (apvts, ids::slot (n, "Dst"));
-            row.amtAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
-                apvts, ids::slot (n, "Amt"), *row.amt);
-            row.amt->setDoubleClickReturnValue (true, 0.0);
-            row.amt->setTooltip (getTooltip (ids::slot (n, "Amt")));
-            row.bi->attach (apvts, ids::slot (n, "Bipolar"));
-        }
-    }
-
-    void resized() override
-    {
-        auto c = content().withTrimmedTop (2);
-        const int rowH = c.getHeight() / 8;
-        for (int i = 0; i < 8; ++i)
-        {
-            auto r = c.removeFromTop (rowH).reduced (0, 2);
-            auto& row = rows[(size_t) i];
-            row.src->setBounds (r.removeFromLeft (100));
-            r.removeFromLeft (4);
-            row.dst->setBounds (r.removeFromLeft (112));
-            r.removeFromLeft (4);
-            row.bi->setBounds (r.removeFromRight (38));
-            row.amt->setBounds (r);
-        }
-    }
-
-private:
-    struct Row
-    {
-        std::unique_ptr<Selector> src, dst;
-        std::unique_ptr<juce::Slider> amt;
-        std::unique_ptr<Toggle> bi;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> amtAttachment;
-    };
-    std::array<Row, 8> rows;
 };
 
 } // namespace ydc
