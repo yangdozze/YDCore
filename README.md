@@ -91,6 +91,26 @@ arpeggiator output, parameter ID uniqueness, user preset save/reload.
 
 ## Installing (FL Studio, Windows)
 
+### Recommended: the GLOBUS installer
+
+Download **`GLOBUS-Installer-Windows-x64.exe`** from the `ci-latest` release and
+run it. The dark-themed setup wizard (Welcome → License → Location → Components
+→ Install → Finish) installs:
+
+- **VST3 plugin** → `C:\Program Files\Common Files\VST3\GLOBUS.vst3`
+- **Standalone app** → `C:\Program Files\Ninth Parallel Audio\GLOBUS\`
+  (Start Menu shortcut, optional Desktop shortcut, optional launch after setup)
+
+x64-only, Windows 10/11, admin rights requested once (Program Files access).
+Re-running the installer upgrades an existing installation in place. **User
+presets are never modified or removed** — not by installation, upgrades or the
+uninstaller (available in Windows Settings ▸ Apps). Installer artwork is
+generated from `tools/gen_installer_assets.py`; the wizard script lives in
+`installer/GLOBUS-Installer.iss` and is compiled + silently install/uninstall
+tested on every CI run.
+
+### Manual install
+
 1. Download `GLOBUS-VST3-Windows-x64.zip` from the GitHub Actions build
    artifacts / `ci-latest` release (or build locally as above).
 2. Extract it and copy the **`GLOBUS.vst3`** folder into:
