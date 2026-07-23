@@ -1,4 +1,4 @@
-// YD Core — 8-slot modulation matrix, evaluated per voice at control rate.
+// GLOBUS — 8-slot modulation matrix, evaluated per voice at control rate.
 #pragma once
 #include "DspUtils.h"
 #include "../Parameters.h"
