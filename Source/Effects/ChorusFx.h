@@ -1,4 +1,4 @@
-// YD Core — stereo chorus: two modulated delay taps, right channel LFO offset
+// GLOBUS — stereo chorus: two modulated delay taps, right channel LFO offset
 // by the width control.
 #pragma once
 #include <vector>
