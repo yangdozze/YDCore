@@ -4,58 +4,35 @@ YDCoreAudioProcessorEditor::YDCoreAudioProcessorEditor (YDCoreAudioProcessor& p)
     : juce::AudioProcessorEditor (&p),
       processor (p),
       topBar (p),
-      osc1 (p.getApvts(), 1),
-      osc2 (p.getApvts(), 2),
-      subNoise (p.getApvts()),
-      lfo1 (p.getApvts(), 1),
-      lfo2 (p.getApvts(), 2),
-      filter (p.getApvts()),
-      ampEnv (p.getApvts(), "AMP ENV", ydc::ids::ampA, ydc::ids::ampD, ydc::ids::ampS, ydc::ids::ampR, ydc::theme::accent),
-      filterEnv (p.getApvts(), "FILTER ENV", ydc::ids::filA, ydc::ids::filD, ydc::ids::filS, ydc::ids::filR, ydc::theme::accent2),
-      modEnv (p.getApvts()),
-      matrix (p.getApvts()),
-      arp (p.getApvts()),
-      global (p.getApvts()),
-      fx (p.getApvts()),
-      keyboard (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard),
-      browser (p)
+      oscPage (p),
+      fxPage (p),
+      matrixPage (p),
+      globalPage (p),
+      presetsPage (p),
+      pages { &oscPage, &fxPage, &matrixPage, &globalPage, &presetsPage }
 {
     setLookAndFeel (&lookAndFeel);
 
-    for (juce::Component* c : { (juce::Component*) &topBar, (juce::Component*) &osc1, (juce::Component*) &osc2,
-                                (juce::Component*) &subNoise, (juce::Component*) &lfo1, (juce::Component*) &lfo2,
-                                (juce::Component*) &filter, (juce::Component*) &ampEnv, (juce::Component*) &filterEnv,
-                                (juce::Component*) &modEnv, (juce::Component*) &matrix, (juce::Component*) &arp,
-                                (juce::Component*) &global, (juce::Component*) &fx, (juce::Component*) &keyboard })
-        content.addAndMakeVisible (*c);
-
-    content.addChildComponent (browser);   // hidden until opened
+    content.addAndMakeVisible (topBar);
+    for (auto* page : pages)
+        content.addChildComponent (*page);
     addAndMakeVisible (content);
 
-    topBar.getPresetButton().onClick = [this] { browser.open (false); };
-    topBar.getSaveButton().onClick   = [this] { browser.open (true); };
-
-    keyboard.setKeyWidth (26.0f);
-    keyboard.setLowestVisibleKey (24);
+    topBar.onTabSelected  = [this] (int idx) { setActiveTab (idx); };
+    topBar.onSaveRequested = [this]
+    {
+        setActiveTab (4);
+        presetsPage.refresh (true);   // jump straight into the Save As field
+    };
+    presetsPage.onClose = [this] { setActiveTab (0); };
 
     // fixed reference layout inside `content`
     content.setSize (kRefW, kRefH);
-    topBar.setBounds (0, 0, kRefW, 52);
-    osc1.setBounds (8, 56, 590, 130);
-    osc2.setBounds (8, 190, 590, 130);
-    subNoise.setBounds (8, 324, 590, 80);
-    lfo1.setBounds (8, 408, 590, 98);
-    lfo2.setBounds (8, 510, 590, 98);
-    filter.setBounds (602, 56, 292, 130);
-    ampEnv.setBounds (898, 56, 294, 130);
-    filterEnv.setBounds (602, 190, 292, 130);
-    modEnv.setBounds (898, 190, 294, 130);
-    matrix.setBounds (602, 324, 364, 284);
-    arp.setBounds (970, 324, 222, 138);
-    global.setBounds (970, 466, 222, 142);
-    fx.setBounds (8, 612, 1184, 92);
-    keyboard.setBounds (8, 708, 1184, 44);
-    browser.setBounds (0, 0, kRefW, kRefH);
+    topBar.setBounds (0, 0, kRefW, kTopBarH);
+    for (auto* page : pages)
+        page->setBounds (0, kTopBarH, kRefW, kRefH - kTopBarH);
+
+    setActiveTab (0);
 
     setResizable (true, true);
     setResizeLimits (900, 600, 2400, 1520);
@@ -65,6 +42,14 @@ YDCoreAudioProcessorEditor::YDCoreAudioProcessorEditor (YDCoreAudioProcessor& p)
 YDCoreAudioProcessorEditor::~YDCoreAudioProcessorEditor()
 {
     setLookAndFeel (nullptr);
+}
+
+void YDCoreAudioProcessorEditor::setActiveTab (int index)
+{
+    activeTab = juce::jlimit (0, kNumTabs - 1, index);
+    for (int i = 0; i < kNumTabs; ++i)
+        pages[i]->setVisible (i == activeTab);
+    topBar.setActiveTab (activeTab);
 }
 
 void YDCoreAudioProcessorEditor::paint (juce::Graphics& g)
