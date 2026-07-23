@@ -1,4 +1,4 @@
-// YD Core — dark graphite look & feel with electric-blue / violet accents.
+// GLOBUS — dark graphite look & feel with electric-blue / violet accents.
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 
