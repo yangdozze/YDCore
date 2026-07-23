@@ -2,7 +2,8 @@
  {
   "name": "Dark Pressure",
   "category": "Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Heavy mono bass with a squashed LP24 bite and sub support.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -39,7 +40,8 @@
  {
   "name": "Rust Bass",
   "category": "Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Corroded pulse-and-saw bass driven through gritty distortion.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.003,
@@ -78,7 +80,8 @@
  {
   "name": "Night Driver",
   "category": "Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Supersaw synthwave bass with a tight filter envelope snap.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -111,7 +114,8 @@
  {
   "name": "Low Orbit",
   "category": "Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Round triangle bass slowly breathing through the filter.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.02,
@@ -144,7 +148,8 @@
  {
   "name": "Concrete Bass",
   "category": "Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Industrial square stack with a hard fifth and drive.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -182,7 +187,8 @@
  {
   "name": "Toxic Mono",
   "category": "Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Acidic legato bass with S&H cutoff jitter and drive.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -226,7 +232,8 @@
  {
   "name": "Sub Voltage",
   "category": "Sub Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Pure sine-plus-square sub for maximum low end.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -251,7 +258,8 @@
  {
   "name": "Chrome 808",
   "category": "Sub Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "808-style knock: pitch-dropped sine with long decay.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -280,7 +288,8 @@
  {
   "name": "Deep Floor",
   "category": "Sub Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Soft sine sub with a hint of triangle body.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.004,
@@ -305,7 +314,8 @@
  {
   "name": "Round Cellar",
   "category": "Sub Bass",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Warm triangle sub with slow filter movement.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.003,
@@ -333,7 +343,8 @@
  {
   "name": "Neon Bite",
   "category": "Lead",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Bright supersaw lead with vibrato, delay and shimmer.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.003,
@@ -379,7 +390,8 @@
  {
   "name": "Cold Razor",
   "category": "Lead",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Cutting square/saw mono lead with tempo-locked echoes.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -417,7 +429,8 @@
  {
   "name": "Digital Cry",
   "category": "Lead",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "PWM lead with a pitch-drop attack and triplet delay.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -464,7 +477,8 @@
  {
   "name": "Broken Signal",
   "category": "Lead",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Glitchy S&H-modulated lead with distorted edges.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -506,7 +520,8 @@
  {
   "name": "Blue Flame",
   "category": "Lead",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Legato solo lead with expressive glide and mod-wheel cutoff.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.004,
@@ -551,7 +566,8 @@
  {
   "name": "Acid Skyline",
   "category": "Lead",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Screaming 303-style resonant mono line with drive.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -591,7 +607,8 @@
  {
   "name": "Glass Steps",
   "category": "Pluck",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Bell-like sine/triangle pluck with airy echoes.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -627,7 +644,8 @@
  {
   "name": "Metro Pluck",
   "category": "Pluck",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Punchy filtered saw pluck for tight sequences.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -660,7 +678,8 @@
  {
   "name": "Crystal Wire",
   "category": "Pluck",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Glassy pulse pluck with sparkle chorus.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -697,7 +716,8 @@
  {
   "name": "Soft Attack",
   "category": "Pluck",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Gentle triangle pluck with a velvet room tail.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.003,
@@ -725,7 +745,8 @@
  {
   "name": "Arcade Dust",
   "category": "Pluck",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Chippy 8-bit style square pluck with grit.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -763,7 +784,8 @@
  {
   "name": "Velvet Pulse",
   "category": "Pluck",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Smooth PWM pluck with a slow-breathing width.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -798,7 +820,8 @@
  {
   "name": "Analog Room",
   "category": "Keys",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Classic saw/square poly keys with warm chorus.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.003,
@@ -837,7 +860,8 @@
  {
   "name": "Soft Machine",
   "category": "Keys",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Mellow triangle keys with wide slow chorus.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.004,
@@ -867,7 +891,8 @@
  {
   "name": "Dusty Digital",
   "category": "Keys",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Lo-fi drifting keys with pink-noise air.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -900,7 +925,8 @@
  {
   "name": "Plastic Piano",
   "category": "Keys",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Percussive velocity-sensitive digital keys.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -939,7 +965,8 @@
  {
   "name": "Minor Lights",
   "category": "Keys",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Detuned unison keys with echo and hall.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.003,
@@ -974,7 +1001,8 @@
  {
   "name": "Empty Room",
   "category": "Pad",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Slow supersaw pad drifting in a large hall.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.8,
@@ -1006,7 +1034,8 @@
  {
   "name": "Frozen Cinema",
   "category": "Pad",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Widescreen cinematic pad with glacial filter sweep.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 1.6,
@@ -1046,7 +1075,8 @@
  {
   "name": "Slow Horizon",
   "category": "Pad",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Layered fifth pad with long attack and echoes.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 2.0,
@@ -1088,7 +1118,8 @@
  {
   "name": "Violet Air",
   "category": "Pad",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Hollow band-pass pad with breathing pulse width.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.7,
@@ -1122,7 +1153,8 @@
  {
   "name": "Wide Memory",
   "category": "Pad",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Double supersaw pad stretched across the stereo field.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 1.1,
@@ -1158,7 +1190,8 @@
  {
   "name": "Dark Cloud",
   "category": "Pad",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Low ominous pad with pink-noise haze.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 1.8,
@@ -1190,7 +1223,8 @@
  {
   "name": "Deep Field",
   "category": "Atmosphere",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Sparse sine layers echoing into deep space.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 2.5,
@@ -1226,7 +1260,8 @@
  {
   "name": "Cold Static",
   "category": "Atmosphere",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Filtered noise-bed texture with slow sweeps.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 1.5,
@@ -1255,7 +1290,8 @@
  {
   "name": "Night Swarm",
   "category": "Atmosphere",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Detuned seven-voice cluster with random pitch drift.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 1.5,
@@ -1292,7 +1328,8 @@
  {
   "name": "Hollow Earth",
   "category": "Atmosphere",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Subterranean drone with slow filter breathing.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 2.8,
@@ -1326,7 +1363,8 @@
  {
   "name": "Night Grid",
   "category": "Arpeggio",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Two-octave 1/16 arpeggio with synced echoes.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -1363,7 +1401,8 @@
  {
   "name": "Fast Orbit",
   "category": "Arpeggio",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Three-octave up/down arpeggio at high energy.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -1402,7 +1441,8 @@
  {
   "name": "Electric Rain",
   "category": "Arpeggio",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Random 1/8 arpeggio with S&H sparkle.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -1448,7 +1488,8 @@
  {
   "name": "Pulse Sequence",
   "category": "Arpeggio",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Driving 1/8 arp with sub weight and drive.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -1489,7 +1530,8 @@
  {
   "name": "Shadow Steps",
   "category": "Arpeggio",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Descending minor-mood arpeggio with echo trails.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -1531,7 +1573,8 @@
  {
   "name": "Reverse Space",
   "category": "FX",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Swelling reverse-style riser into a huge wash.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 3.5,
@@ -1566,7 +1609,8 @@
  {
   "name": "Signal Fall",
   "category": "FX",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Falling pitch effect with gated tremolo.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.005,
@@ -1605,7 +1649,8 @@
  {
   "name": "Ghost Motion",
   "category": "FX",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Haunted band-pass noise drifting slowly.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 1.2,
@@ -1635,7 +1680,8 @@
  {
   "name": "Broken Radio",
   "category": "FX",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Detuned static transmission with chopper AM.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.01,
@@ -1670,7 +1716,8 @@
  {
   "name": "Deep Impact",
   "category": "FX",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Cinematic sub drop with noise rumble.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -1704,7 +1751,8 @@
  {
   "name": "Fold Machine",
   "category": "Experimental",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Aggressive folded squares with S&H pulse width.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.002,
@@ -1736,7 +1784,8 @@
  {
   "name": "Random Walk",
   "category": "Experimental",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Melodic S&H pitch wander with dub echoes.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.005,
@@ -1767,7 +1816,8 @@
  {
   "name": "Metal Garden",
   "category": "Experimental",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Inharmonic metallic clangs with resonant ring.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
@@ -1803,7 +1853,8 @@
  {
   "name": "Glitch Bloom",
   "category": "Experimental",
-  "author": "Yangdozze",
+  "author": "Ninth Parallel Audio",
+  "description": "Hyperactive 1/32 random arp with bitcrush-like grit.",
   "format": "YDCore-1",
   "params": {
    "ampAttack": 0.001,
