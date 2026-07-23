@@ -1,4 +1,4 @@
-// YD Core — tempo-synced arpeggiator. Sits before the synth engine and
+// GLOBUS — tempo-synced arpeggiator. Sits before the synth engine and
 // transforms note input into pattern steps (up/down/up-down/random, 1-3 octaves,
 // gate control, hold/latch). Locks to the host grid when the transport runs.
 #pragma once
