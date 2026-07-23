@@ -26,13 +26,19 @@ const juce::StringArray& PresetManager::categoryOrder()
 juce::File PresetManager::userPresetDirectory()
 {
     return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+              .getChildFile ("GLOBUS").getChildFile ("Presets");
+}
+
+juce::File PresetManager::legacyUserPresetDirectory()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
               .getChildFile ("YDCore").getChildFile ("Presets");
 }
 
 juce::File PresetManager::favoritesFile()
 {
     return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-              .getChildFile ("YDCore").getChildFile ("favorites.json");
+              .getChildFile ("GLOBUS").getChildFile ("favorites.json");
 }
 
 //==============================================================================
@@ -53,6 +59,8 @@ void PresetManager::rescan()
             PresetInfo info;
             info.name        = obj->getProperty ("name").toString();
             info.category    = obj->getProperty ("category").toString();
+            info.author      = obj->getProperty ("author").toString();
+            info.description = obj->getProperty ("description").toString();
             info.isFactory   = true;
             info.binaryIndex = i;
             if (info.name.isNotEmpty())
@@ -60,28 +68,43 @@ void PresetManager::rescan()
         }
     }
 
-    // ---- user presets from disk
-    const auto dir = userPresetDirectory();
-    if (dir.isDirectory())
+    // ---- user presets from disk (current + legacy folder)
+    auto scanUserDir = [this] (const juce::File& dir)
     {
+        if (! dir.isDirectory())
+            return;
         for (const auto& f : dir.findChildFiles (juce::File::findFiles, false, "*.json"))
         {
             const auto parsed = juce::JSON::parse (f.loadFileAsString());
             if (auto* obj = parsed.getDynamicObject())
             {
                 PresetInfo info;
-                info.name      = obj->getProperty ("name").toString();
-                info.category  = obj->getProperty ("category").toString();
-                info.isFactory = false;
-                info.file      = f;
+                info.name        = obj->getProperty ("name").toString();
+                info.category    = obj->getProperty ("category").toString();
+                info.author      = obj->getProperty ("author").toString();
+                info.description = obj->getProperty ("description").toString();
+                info.isFactory   = false;
+                info.file        = f;
                 if (info.name.isEmpty())
                     info.name = f.getFileNameWithoutExtension();
                 if (info.category.isEmpty())
                     info.category = "User";
-                presets.push_back (std::move (info));
+                // skip duplicates by name (current dir wins over legacy)
+                bool duplicate = false;
+                for (const auto& existing : presets)
+                    if (! existing.isFactory && existing.name == info.name)
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                if (! duplicate)
+                    presets.push_back (std::move (info));
             }
         }
-    }
+    };
+    scanUserDir (userPresetDirectory());
+    if (legacyUserPresetDirectory() != userPresetDirectory())
+        scanUserDir (legacyUserPresetDirectory());
 
     // ---- stable display order: category (fixed order), then name
     const auto& order = categoryOrder();
@@ -359,9 +382,16 @@ void PresetManager::randomizePatch()
 void PresetManager::loadFavorites()
 {
     favorites.clear();
-    const auto f = favoritesFile();
+    auto f = favoritesFile();
     if (! f.existsAsFile())
-        return;
+    {
+        // migrate from the legacy YDCore location if present
+        const auto legacy = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                               .getChildFile ("YDCore").getChildFile ("favorites.json");
+        if (! legacy.existsAsFile())
+            return;
+        f = legacy;
+    }
     const auto parsed = juce::JSON::parse (f.loadFileAsString());
     if (auto* arr = parsed.getArray())
         for (const auto& v : *arr)
