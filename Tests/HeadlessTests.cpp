@@ -1,7 +1,8 @@
-// YD Core — headless verification suite. Renders the real processor offline:
+// GLOBUS — headless verification suite. Renders the real processor offline:
 // no audio device, no window. Exit code 0 = all checks passed.
 #include <juce_events/juce_events.h>
 #include "../Source/PluginProcessor.h"
+#include "../Source/PluginEditor.h"
 
 namespace
 {
@@ -150,6 +151,11 @@ void testAllPresetsLoadAndSound()
         const auto info = pm.getPresets()[(size_t) i];
         expect (pm.loadPresetAt (i), "preset loads: " + info.name);
         categoriesSeen.addIfNotAlreadyThere (info.category);
+        if (info.isFactory)
+        {
+            expect (info.author == "Ninth Parallel Audio", "factory preset author is branded: " + info.name);
+            expect (info.description.isNotEmpty(), "factory preset has a description: " + info.name);
+        }
 
         auto stats = renderBlocks (proc, 24000, 512,
             [&] (juce::MidiBuffer& midi, int start, int)
@@ -384,31 +390,57 @@ void testSaveUserPreset()
 } // namespace
 
 //==============================================================================
-/** --screenshot <file.png>: instantiate the real editor and dump it as a PNG
-    (requires a display / Xvfb). Also validates that the editor constructs. */
-static int runScreenshot (const juce::String& outPath)
+static bool writePng (juce::Component& comp, const juce::File& out)
+{
+    auto image = comp.createComponentSnapshot (comp.getLocalBounds(), true, 1.0f);
+    out.deleteFile();
+    juce::FileOutputStream stream (out);
+    juce::PNGImageFormat png;
+    return stream.openedOk() && png.writeImageToStream (image, stream);
+}
+
+/** --screenshot <file.png>: dump the editor (OSC tab) as a PNG.
+    --screenshots <dir>: dump every tab as tab0_osc.png .. tab4_presets.png.
+    Requires a display / Xvfb; also validates that the editor constructs. */
+static int runScreenshot (const juce::String& outPath, bool allTabs)
 {
     YDCoreAudioProcessor proc;
     proc.prepareToPlay (48000.0, 512);
     loadPresetByName (proc, "Neon Bite");
 
-    std::unique_ptr<juce::AudioProcessorEditor> editor (proc.createEditor());
+    std::unique_ptr<juce::AudioProcessorEditor> editorBase (proc.createEditor());
+    auto* editor = dynamic_cast<YDCoreAudioProcessorEditor*> (editorBase.get());
     if (editor == nullptr)
     {
-        std::cout << "[FAIL] createEditor returned null" << std::endl;
+        std::cout << "[FAIL] createEditor returned null / wrong type" << std::endl;
         return 1;
     }
     editor->setSize (1200, 760);
 
-    auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
-    juce::File out = juce::File::getCurrentWorkingDirectory().getChildFile (outPath);
-    out.deleteFile();
-    juce::FileOutputStream stream (out);
-    juce::PNGImageFormat png;
-    const bool ok = stream.openedOk() && png.writeImageToStream (image, stream);
-    std::cout << (ok ? "[OK] " : "[FAIL] ") << "editor snapshot -> " << out.getFullPathName() << std::endl;
-    editor.reset();
-    return ok ? 0 : 1;
+    int failures2 = 0;
+    if (allTabs)
+    {
+        const char* tabNames[] = { "osc", "fx", "matrix", "global", "presets" };
+        juce::File dir = juce::File::getCurrentWorkingDirectory().getChildFile (outPath);
+        dir.createDirectory();
+        for (int i = 0; i < YDCoreAudioProcessorEditor::kNumTabs; ++i)
+        {
+            editor->setActiveTab (i);
+            const auto f = dir.getChildFile ("tab" + juce::String (i) + "_" + tabNames[i] + ".png");
+            const bool ok = writePng (*editor, f);
+            std::cout << (ok ? "[OK] " : "[FAIL] ") << f.getFullPathName() << std::endl;
+            if (! ok) ++failures2;
+        }
+    }
+    else
+    {
+        const auto f = juce::File::getCurrentWorkingDirectory().getChildFile (outPath);
+        const bool ok = writePng (*editor, f);
+        std::cout << (ok ? "[OK] " : "[FAIL] ") << "editor snapshot -> " << f.getFullPathName() << std::endl;
+        if (! ok) ++failures2;
+    }
+    editorBase.reset();
+    return failures2 == 0 ? 0 : 1;
 }
 
 int main (int argc, char* argv[])
@@ -416,9 +448,11 @@ int main (int argc, char* argv[])
     juce::ScopedJuceInitialiser_GUI juceInit;
 
     if (argc >= 3 && juce::String (argv[1]) == "--screenshot")
-        return runScreenshot (juce::String (argv[2]));
+        return runScreenshot (juce::String (argv[2]), false);
+    if (argc >= 3 && juce::String (argv[1]) == "--screenshots")
+        return runScreenshot (juce::String (argv[2]), true);
 
-    std::cout << "YD Core headless verification suite" << std::endl;
+    std::cout << "GLOBUS headless verification suite" << std::endl;
 
     for (double sr : { 44100.0, 48000.0 })
         for (int bs : { 32, 64, 256, 1024, 4096 })
