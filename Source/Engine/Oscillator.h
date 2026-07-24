@@ -197,10 +197,13 @@ public:
     void prepare (double sampleRate) noexcept { invSr = 1.0 / sampleRate; sr = sampleRate; }
     void reset (Rng& voiceRng) noexcept { phase = (double) voiceRng.uni(); }
 
-    void render (float* outL, float* outR, int n, float freqHz, bool square, float gain) noexcept
+    void render (float* outL, float* outR, int n, float freqHz, bool square, float gain, float pan = 0.0f) noexcept
     {
         if (gain <= 0.0001f)
             return;
+        float gl, gr;
+        panGains (pan, gl, gr);
+        gl *= gain; gr *= gain;
         const double dt = clampf (freqHz, 0.01f, (float) (sr * 0.45)) * invSr;
         double ph = phase;
         if (square)
@@ -211,8 +214,8 @@ public:
                 v += polyBlep (ph, dt);
                 double t2 = ph + 0.5; t2 -= std::floor (t2);
                 v -= polyBlep (t2, dt);
-                const float o = v * gain * 0.9f;
-                outL[s] += o; outR[s] += o;
+                outL[s] += v * gl * 0.9f;
+                outR[s] += v * gr * 0.9f;
                 ph += dt; if (ph >= 1.0) ph -= 1.0;
             }
         }
@@ -220,8 +223,9 @@ public:
         {
             for (int s = 0; s < n; ++s)
             {
-                const float o = std::sin ((float) ph * kTwoPi) * gain;
-                outL[s] += o; outR[s] += o;
+                const float v = std::sin ((float) ph * kTwoPi);
+                outL[s] += v * gl;
+                outR[s] += v * gr;
                 ph += dt; if (ph >= 1.0) ph -= 1.0;
             }
         }
@@ -246,10 +250,12 @@ public:
     void reset (Rng& voiceRng) noexcept { rng.seed (voiceRng.next()); }
 
     /** tone: -1 (dark) .. +1 (bright) */
-    void render (float* outL, float* outR, int n, bool pink, float gain, float tone) noexcept
+    void render (float* outL, float* outR, int n, bool pink, float gain, float tone, float pan = 0.0f) noexcept
     {
         if (gain <= 0.0001f)
             return;
+        float gl, gr;
+        panGains (pan, gl, gr);
 
         // tone tilt: negative = one-pole LP sweeping down, positive = one-pole HP sweeping up
         const float lpF = tone < 0.0f ? std::exp2 (std::log2 (20000.0f) + tone * 6.0f) : 20000.0f;
@@ -275,8 +281,8 @@ public:
                 v -= hpState;
             }
             const float o = v * gain * 0.8f;
-            outL[s] += o;
-            outR[s] += o;
+            outL[s] += o * gl;
+            outR[s] += o * gr;
         }
     }
 
