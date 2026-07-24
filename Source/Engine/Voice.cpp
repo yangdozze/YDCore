@@ -243,12 +243,14 @@ void Voice::renderChunk (float* L, float* R, int absStart, int n, const RenderCo
         sub.render (tmpL, tmpR, n,
                     noteToHz (clampf (currentNote + pbSemis - 12.0f, -12.0f, 135.0f)),
                     P.subWave->load() > 0.5f,
-                    P.subLevel->load());
+                    P.subLevel->load(),
+                    P.subPan->load());
 
     {
         const float nl = clampf (P.noiseLevel->load() + mv.noiseLevelAdd, 0.0f, 1.0f);
         if (nl > 0.0001f)
-            noise.render (tmpL, tmpR, n, P.noiseType->load() > 0.5f, nl, P.noiseTone->load());
+            noise.render (tmpL, tmpR, n, P.noiseType->load() > 0.5f, nl, P.noiseTone->load(),
+                          P.noisePan->load());
     }
 
     // ---- filter
