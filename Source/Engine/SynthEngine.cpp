@@ -249,7 +249,10 @@ void SynthEngine::noteOn (int note, float vel, const ParamRefs& params)
 
     const auto mode = (PlayMode) (int) params.playMode->load();
     const float glideTime = params.glideTime->load();
-    const float glideFrom = (glideTime > 0.001f && lastPlayedNote >= 0.0f) ? lastPlayedNote : -1.0f;
+    // Portamento is a mono/legato behaviour: gliding every poly voice from the
+    // previously played note would smear chords, so poly starts at pitch.
+    const float glideFrom = (mode != PlayMode::Poly && glideTime > 0.001f && lastPlayedNote >= 0.0f)
+                          ? lastPlayedNote : -1.0f;
 
     if (mode == PlayMode::Poly)
     {
@@ -301,14 +304,21 @@ void SynthEngine::noteOff (int note, const ParamRefs& params)
 
     if (mode == PlayMode::Poly)
     {
+        // Note-off ownership: one note-off releases exactly ONE voice of that
+        // pitch (the oldest still-held one). Repeated same-pitch notes each own
+        // their voice, so on/off pairs match one-to-one.
+        Voice* victim = nullptr;
         for (auto& v : voices)
-            if (v.isActive() && v.getNote() == note && ! v.isReleasing())
-            {
-                if (pedalDown)
-                    v.setSustained (true);
-                else
-                    v.stopNote();
-            }
+            if (v.isActive() && v.getNote() == note && ! v.isReleasing() && ! v.isSustained())
+                if (victim == nullptr || v.getOrder() < victim->getOrder())
+                    victim = &v;
+        if (victim != nullptr)
+        {
+            if (pedalDown)
+                victim->setSustained (true);
+            else
+                victim->stopNote();
+        }
     }
     else
     {
