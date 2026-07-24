@@ -136,6 +136,15 @@ folder is still read, and favorites migrate automatically).
   hover shows the exact value. Every control has a tooltip.
 - The window resizes freely from 900×600 up to 2400×1520 (layout scales).
 
+## Signing status
+
+Published artifacts are currently **unsigned development builds** — Windows
+SmartScreen shows an *Unknown publisher* warning, which is expected and not
+bypassed. The CI pipeline is signing-ready: adding Azure Trusted Signing
+credentials as encrypted repository secrets enables automatic signing,
+verification and honest release labeling. Full guide: `docs/SIGNING.md`.
+Verify all downloads against the published `SHA256SUMS.txt`.
+
 ## Known limitations (non-blocking)
 
 - Free-running (non-retriggered) LFOs ignore per-voice *LFO Rate* modulation;
