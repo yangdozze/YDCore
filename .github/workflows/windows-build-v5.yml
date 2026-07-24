@@ -258,7 +258,7 @@ jobs:
             "dist/GLOBUS-VST3-Windows-x64.zip" `
             "dist/GLOBUS-Standalone-Windows-x64.zip" `
             "dist/SHA256SUMS.txt" `
-            --title "GLOBUS 1.1.0 - Windows x64 (CI build)" `
+            --title "GLOBUS 1.2.0 - Windows x64 (CI build)" `
             --notes "Automated Windows x64 Release build by Ninth Parallel Audio. Easiest install: run GLOBUS-Installer-Windows-x64.exe (VST3 to Common Files\VST3, Standalone app, Start Menu shortcut, uninstaller; user presets are never touched). Manual install: unzip GLOBUS-VST3-Windows-x64.zip and copy 'GLOBUS.vst3' to C:\Program Files\Common Files\VST3, then rescan plugins in FL Studio. Verify downloads against SHA256SUMS.txt. $signNote Commit ${{ github.sha }}."
           exit 0
 
