@@ -97,6 +97,13 @@ void LookAndFeelYD::drawRotarySlider (juce::Graphics& g, int x, int y, int w, in
     pointer.lineTo (centre.getPointOnCircumference (pr, angle));
     g.setColour (slider.isEnabled() ? theme::text : theme::textDim);
     g.strokePath (pointer, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+    // keyboard-focus ring
+    if (slider.hasKeyboardFocus (false))
+    {
+        g.setColour (theme::accent.withAlpha (0.55f));
+        g.drawEllipse (centre.x - arcR - 2.5f, centre.y - arcR - 2.5f, (arcR + 2.5f) * 2.0f, (arcR + 2.5f) * 2.0f, 1.4f);
+    }
 }
 
 void LookAndFeelYD::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int h, float sliderPos,
@@ -190,6 +197,12 @@ void LookAndFeelYD::drawToggleButton (juce::Graphics& g, juce::ToggleButton& but
     g.setFont (uiFont (juce::jmin (13.0f, bounds.getHeight() * 0.7f)));
     g.drawText (button.getButtonText(), bounds.withTrimmedLeft (led + 7.0f).toNearestInt(),
                 juce::Justification::centredLeft, true);
+
+    if (button.hasKeyboardFocus (false))
+    {
+        g.setColour (theme::accent.withAlpha (0.45f));
+        g.drawRoundedRectangle (bounds.reduced (0.5f), 3.0f, 1.2f);
+    }
 }
 
 void LookAndFeelYD::drawButtonBackground (juce::Graphics& g, juce::Button& button, const juce::Colour& bgCol,
