@@ -61,9 +61,11 @@ namespace ids
     inline constexpr const char* subOn      = "subOn";
     inline constexpr const char* subWave    = "subWave";
     inline constexpr const char* subLevel   = "subLevel";
+    inline constexpr const char* subPan     = "subPan";      // added in 1.1 quality update
     inline constexpr const char* noiseType  = "noiseType";
     inline constexpr const char* noiseLevel = "noiseLevel";
     inline constexpr const char* noiseTone  = "noiseTone";
+    inline constexpr const char* noisePan   = "noisePan";    // added in 1.1 quality update
 
     // Filter
     inline constexpr const char* filterOn     = "filterOn";
@@ -151,8 +153,8 @@ struct ParamRefs
     explicit ParamRefs (juce::AudioProcessorValueTreeState& s);
 
     std::array<OscRefs, 2> osc;
-    std::atomic<float> *subOn, *subWave, *subLevel;
-    std::atomic<float> *noiseType, *noiseLevel, *noiseTone;
+    std::atomic<float> *subOn, *subWave, *subLevel, *subPan;
+    std::atomic<float> *noiseType, *noiseLevel, *noiseTone, *noisePan;
 
     std::atomic<float> *filterOn, *filterType, *cutoff, *resonance, *filterDrive, *keyTrack, *filterEnvAmt;
 
