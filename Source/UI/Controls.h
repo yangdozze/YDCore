@@ -173,33 +173,83 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> attachment;
 };
 
-/** Titled panel that hosts a section's controls. */
+/** Titled panel that hosts a section's controls (frameless mode = bare content
+    area for embedding inside another panel, e.g. the modulation editor). */
 class SectionPanel : public juce::Component
 {
 public:
     explicit SectionPanel (const juce::String& titleText, juce::Colour accent = theme::accent)
         : title (titleText), accentColour (accent) {}
 
+    void setFrameless (bool shouldBeFrameless) { frameless = shouldBeFrameless; repaint(); }
+
     void paint (juce::Graphics& g) override
     {
+        if (frameless)
+            return;
         auto b = getLocalBounds().toFloat().reduced (1.0f);
-        g.setColour (theme::panel);
+        g.setGradientFill (juce::ColourGradient (theme::panel.brighter (0.02f), 0, 0,
+                                                 theme::panel.darker (0.04f), 0, b.getBottom(), false));
         g.fillRoundedRectangle (b, 6.0f);
         g.setColour (theme::outline);
         g.drawRoundedRectangle (b, 6.0f, 1.0f);
 
         g.setColour (accentColour);
-        g.fillRoundedRectangle (8.0f, 7.0f, 3.0f, 12.0f, 1.5f);
+        g.fillRoundedRectangle (8.0f, 6.0f, 3.0f, 11.0f, 1.5f);
         g.setColour (theme::text);
-        g.setFont (LookAndFeelYD::uiFont (12.5f, true));
-        g.drawText (title, 17, 4, getWidth() - 24, 18, juce::Justification::centredLeft);
+        g.setFont (LookAndFeelYD::uiFont (12.0f, true));
+        g.drawText (title, 17, 3, getWidth() - 24, 16, juce::Justification::centredLeft);
     }
 
-    juce::Rectangle<int> content() const { return getLocalBounds().reduced (8).withTrimmedTop (18); }
+    juce::Rectangle<int> content() const
+    {
+        return frameless ? getLocalBounds().reduced (4)
+                         : getLocalBounds().reduced (7).withTrimmedTop (16);
+    }
 
 private:
     juce::String title;
     juce::Colour accentColour;
+    bool frameless = false;
+};
+
+//==============================================================================
+/** Padlock toggle for the randomizer section locks (session UI state; not a
+    host parameter). All buttons bound to the same section stay in sync. */
+class LockButton : public juce::Button
+{
+public:
+    LockButton (std::function<bool()> get, std::function<void (bool)> set, const juce::String& sectionName)
+        : juce::Button ("lock"), getter (std::move (get)), setter (std::move (set))
+    {
+        setTooltip ("Lock the " + sectionName + " section against randomization");
+        setClickingTogglesState (false);
+        onClick = [this] { setter (! getter()); repaint(); };
+    }
+
+    void paintButton (juce::Graphics& g, bool highlighted, bool) override
+    {
+        const bool locked = getter();
+        const auto col = locked ? theme::warn : (highlighted ? theme::text : theme::textDim.withAlpha (0.55f));
+        auto b = getLocalBounds().toFloat();
+        const float s = juce::jmin (b.getWidth(), b.getHeight());
+        const auto c = b.getCentre();
+
+        // body
+        const float bw = s * 0.52f, bh = s * 0.40f;
+        g.setColour (col);
+        g.fillRoundedRectangle (c.x - bw / 2, c.y - bh * 0.1f, bw, bh, 2.0f);
+        // shackle (open when unlocked)
+        juce::Path sh;
+        const float r = bw * 0.34f;
+        sh.addCentredArc (c.x + (locked ? 0.0f : bw * 0.18f), c.y - bh * 0.15f, r, r * 1.25f,
+                          0.0f, -juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, true);
+        g.strokePath (sh, juce::PathStrokeType (1.6f));
+    }
+
+private:
+    std::function<bool()> getter;
+    std::function<void (bool)> setter;
 };
 
 /** Lay a row of equally-sized cells across a bounds rectangle. */
