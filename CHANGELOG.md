@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.1.0 quality update — 2026-07-24
+
+- **Polyphony fix:** a note-off now releases exactly ONE voice of its pitch
+  (previously every same-pitch voice was stopped), and poly mode no longer
+  inherits portamento glide from the previously played note. Verified with a
+  new pitch-energy regression suite (overlaps, chords, repeated notes, sustain,
+  stealing, priorities, all 51 presets). Preset mode census: 39 Poly, 9 Mono,
+  3 Legato (intentional), 6 with arpeggiator — the "silent second note" on
+  mono/legato presets is by design and the play mode is now displayed in the
+  top bar.
+- **Compact UI:** signal-flow OSC page (oscillators → sub/noise → filter →
+  tabbed modulation editor with live envelope/LFO graphs → keyboard), FX page
+  as a real left-to-right chain with unmistakable ON/BYPASSED states and live
+  mix readouts, denser matrix rows with slot activity, tighter GLOBAL page.
+  Top bar adds play-mode badge, modified-preset indicator, randomize strength
+  menu and undo. Keyboard-focus rings, hover value readouts everywhere.
+- **New parameters:** Sub Pan and Noise Pan (real DSP; default centre, fully
+  backward compatible).
+- **Randomizer 2.0:** SUBTLE / NORMAL / WILD strengths, five section locks
+  (OSC, FILTER, ENVELOPES, LFO/MATRIX, FX) via padlocks and the RAND menu,
+  one-step Undo Randomize, musical safety rules (guaranteed audible source,
+  bounded resonance/feedback/mix, interval-based tuning, no duplicate matrix
+  routes, protected master/play-mode/bend/velocity/arp). 1000+ automated
+  randomizer runs in the test suite.
+- **CI:** SHA-256 checksums published with every release; secure
+  signing-ready pipeline (Azure Trusted Signing via encrypted secrets — see
+  docs/SIGNING.md). Artifacts are clearly labeled unsigned until credentials
+  are provided.
+- Test suite grown to 500+ checks.
+
 ## 1.1.0 — 2026-07-23 — "GLOBUS"
 
 Rebrand + interface generation 2.
