@@ -39,7 +39,24 @@ public:
     bool saveUserPreset (const juce::String& name, const juce::String& category); // save/save-as
     bool deleteUserPreset (int index);
     void initPatch();
-    void randomizePatch();
+
+    //==========================================================================
+    // Randomizer (message-thread only)
+    //==========================================================================
+    enum class Strength { Subtle, Normal, Wild };
+    enum Section { LockOsc = 0, LockFilter, LockEnv, LockLfoMatrix, LockFx, NumLocks };
+
+    void randomizePatch (Strength strength = Strength::Normal);
+    bool canUndoRandomize() const noexcept { return hasUndo; }
+    void undoRandomize();
+
+    /** Section locks: locked sections are preserved exactly by the randomizer.
+        UI-session state only — not host-automatable, not saved into presets. */
+    bool isSectionLocked (Section s) const noexcept { return locks[(size_t) s].load(); }
+    void setSectionLocked (Section s, bool locked) noexcept { locks[(size_t) s].store (locked); }
+
+    /** True when any parameter differs from the last loaded/saved snapshot. */
+    bool isModified() const;
 
     bool isFavorite (const juce::String& name) const;
     void toggleFavorite (const juce::String& name);
@@ -54,6 +71,11 @@ private:
     bool applyPresetJson (const juce::var& root);
     void setAllParametersToDefaults();
     void setParamReal (const juce::String& paramID, float realValue);
+    int  sectionOfParam (const juce::String& paramID) const;   // -1 = never randomized
+    void captureUndoSnapshot();
+    void captureCleanSnapshot();                                // for the modified indicator
+    void applyRandomRecipe (Strength strength, juce::Random& rnd,
+                            const std::map<juce::String, float>& preservedNorm);
     juce::var buildPresetJson (const juce::String& name, const juce::String& category) const;
     void loadFavorites();
     void saveFavorites() const;
@@ -63,6 +85,12 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
     std::vector<PresetInfo> presets;
     juce::StringArray favorites;
+
+    std::array<std::atomic<bool>, NumLocks> locks { false, false, false, false, false };
+    std::vector<std::pair<juce::String, float>> undoSnapshot;   // paramID -> normalized
+    juce::String undoName, undoCategory;
+    bool hasUndo = false;
+    std::vector<float> cleanSnapshot;                            // normalized, in getParameters() order
 
     JUCE_DECLARE_NON_COPYABLE (PresetManager)
 };
