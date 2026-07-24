@@ -29,6 +29,8 @@
   docs/SIGNING.md). Artifacts are clearly labeled unsigned until credentials
   are provided.
 - Test suite grown to 500+ checks.
+- **Repository renamed** to github.com/yangdozze/GLOBUS (history, releases and
+  Actions preserved; the old YDCore URL redirects automatically).
 
 ## 1.1.0 — 2026-07-23 — "GLOBUS"
 
