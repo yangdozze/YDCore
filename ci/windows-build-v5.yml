@@ -207,9 +207,12 @@ jobs:
           Compress-Archive -Path "build/YDCore_artefacts/Release/VST3/GLOBUS.vst3" -DestinationPath "dist/GLOBUS-VST3-Windows-x64.zip"
           Compress-Archive -Path "build/YDCore_artefacts/Release/Standalone/GLOBUS.exe" -DestinationPath "dist/GLOBUS-Standalone-Windows-x64.zip"
           Copy-Item "installer/Output/GLOBUS-Installer-Windows-x64.exe" "dist/"
-          Get-FileHash dist/* -Algorithm SHA256 | ForEach-Object {
-            "$($_.Hash)  $(Split-Path $_.Path -Leaf)"
-          } | Out-File "dist/SHA256SUMS.txt" -Encoding ascii
+          # hash into a variable FIRST (a streaming pipeline would try to hash
+          # the checksum file it is itself creating inside dist/)
+          $files = Get-ChildItem "dist" -File
+          $hashes = $files | Get-FileHash -Algorithm SHA256
+          $lines = $hashes | ForEach-Object { "$($_.Hash)  $(Split-Path $_.Path -Leaf)" }
+          $lines | Out-File "dist/SHA256SUMS.txt" -Encoding ascii
           Get-Content "dist/SHA256SUMS.txt"
 
       - name: Upload VST3
