@@ -124,7 +124,7 @@ public:
         }
         tabs[0]->setToggleState (true, juce::dontSendNotification);
 
-        presetButton.setTooltip ("Open the preset bank");
+        presetButton.setTooltip ("Open the preset bank. A dot marks unsaved changes.");
         presetButton.onClick = [this] { if (onTabSelected) onTabSelected (4); };
         addAndMakeVisible (presetButton);
 
@@ -138,6 +138,14 @@ public:
         nextButton.onClick = [this] { processor.getPresetManager().loadNext (true); refreshPresetName(); };
         addAndMakeVisible (nextButton);
 
+        modeLabel.setJustificationType (juce::Justification::centred);
+        modeLabel.setFont (LookAndFeelYD::uiFont (10.5f, true));
+        modeLabel.setColour (juce::Label::textColourId, theme::accent);
+        modeLabel.setColour (juce::Label::outlineColourId, theme::outline);
+        modeLabel.setTooltip ("Current play mode (Poly / Mono / Legato) - change it on the GLOBAL page");
+        modeLabel.setText ("POLY", juce::dontSendNotification);
+        addAndMakeVisible (modeLabel);
+
         saveButton.setButtonText ("SAVE");
         saveButton.setTooltip ("Save the current sound as a user preset");
         saveButton.onClick = [this] { if (onSaveRequested) onSaveRequested(); };
@@ -149,13 +157,32 @@ public:
         addAndMakeVisible (initButton);
 
         randButton.setButtonText ("RAND");
-        randButton.setTooltip ("Generate a random patch");
-        randButton.onClick = [this] { processor.getPresetManager().randomizePatch(); refreshPresetName(); };
+        randButton.setTooltip ("Randomize the sound (Normal strength). Use the arrow for Subtle/Wild and section locks.");
+        randButton.onClick = [this]
+        {
+            processor.getPresetManager().randomizePatch (ydc::PresetManager::Strength::Normal);
+            refreshPresetName();
+        };
         addAndMakeVisible (randButton);
 
+        randMenuButton.setButtonText (juce::String::fromUTF8 ("\xe2\x96\xbe"));
+        randMenuButton.setTooltip ("Randomize options: strength and section locks");
+        randMenuButton.onClick = [this] { showRandMenu(); };
+        addAndMakeVisible (randMenuButton);
+
+        undoButton.setButtonText (juce::String::fromUTF8 ("\xe2\x86\xa9"));
+        undoButton.setTooltip ("Undo the last randomize (restores the exact previous sound)");
+        undoButton.onClick = [this]
+        {
+            processor.getPresetManager().undoRandomize();
+            refreshPresetName();
+        };
+        addAndMakeVisible (undoButton);
+
         statusLabel.setJustificationType (juce::Justification::centredRight);
-        statusLabel.setFont (LookAndFeelYD::uiFont (10.5f));
+        statusLabel.setFont (LookAndFeelYD::uiFont (10.0f));
         statusLabel.setColour (juce::Label::textColourId, theme::textDim);
+        statusLabel.setText ("CPU 0%  VOX 0", juce::dontSendNotification);
         addAndMakeVisible (statusLabel);
 
         addAndMakeVisible (meter);
@@ -176,9 +203,14 @@ public:
     void refreshPresetName()
     {
         auto& pm = processor.getPresetManager();
+        const bool modified = pm.isModified();
         const auto cat = pm.getCurrentCategory();
-        presetButton.setButtonText ((cat.isNotEmpty() && cat != "Init" ? cat + "  |  " : juce::String())
-                                    + pm.getCurrentName());
+        presetButton.setButtonText ((modified ? juce::String::fromUTF8 ("\xe2\x97\x8f ") : juce::String())
+                                    + (cat.isNotEmpty() && cat != "Init" ? cat + "  |  " : juce::String())
+                                    + pm.getCurrentName()
+                                    + (modified ? " *" : ""));
+        presetButton.setColour (juce::TextButton::textColourOffId, modified ? theme::warn : theme::text);
+        undoButton.setEnabled (pm.canUndoRandomize());
     }
 
     void paint (juce::Graphics& g) override
@@ -191,24 +223,24 @@ public:
 
         // --- brand: globe glyph (latitude/longitude arcs) + wordmark
         {
-            const float cx = 25.0f, cy = getHeight() * 0.5f - 4.0f, r = 12.0f;
+            const float cx = 24.0f, cy = getHeight() * 0.5f - 4.0f, r = 12.0f;
             g.setColour (theme::accent);
             g.drawEllipse (cx - r, cy - r, r * 2.0f, r * 2.0f, 1.6f);
             g.setColour (theme::accent.withAlpha (0.75f));
-            g.drawEllipse (cx - r * 0.45f, cy - r, r * 0.9f, r * 2.0f, 1.1f);      // meridian
+            g.drawEllipse (cx - r * 0.45f, cy - r, r * 0.9f, r * 2.0f, 1.1f);
             g.setColour (theme::accent2.withAlpha (0.9f));
-            g.drawLine (cx - r, cy, cx + r, cy, 1.1f);                              // equator
+            g.drawLine (cx - r, cy, cx + r, cy, 1.1f);
             const float pr = r * 0.62f;
             g.setColour (theme::accent2.withAlpha (0.55f));
-            g.drawLine (cx - pr, cy - r * 0.52f, cx + pr, cy - r * 0.52f, 0.9f);    // 9th parallel up
-            g.drawLine (cx - pr, cy + r * 0.52f, cx + pr, cy + r * 0.52f, 0.9f);    // and down
+            g.drawLine (cx - pr, cy - r * 0.52f, cx + pr, cy - r * 0.52f, 0.9f);
+            g.drawLine (cx - pr, cy + r * 0.52f, cx + pr, cy + r * 0.52f, 0.9f);
 
             g.setColour (theme::text);
-            g.setFont (LookAndFeelYD::uiFont (21.0f, true));
-            g.drawText ("GLOBUS", 44, 8, 100, 26, juce::Justification::centredLeft);
+            g.setFont (LookAndFeelYD::uiFont (19.0f, true));
+            g.drawText ("GLOBUS", 42, 8, 92, 24, juce::Justification::centredLeft);
             g.setColour (theme::textDim);
-            g.setFont (LookAndFeelYD::uiFont (8.5f));
-            g.drawText ("NINTH PARALLEL AUDIO", 45, 36, 130, 11, juce::Justification::centredLeft);
+            g.setFont (LookAndFeelYD::uiFont (8.0f));
+            g.drawText ("NINTH PARALLEL AUDIO", 43, 34, 120, 11, juce::Justification::centredLeft);
         }
 
         // --- MIDI LED
@@ -221,8 +253,8 @@ public:
             g.fillEllipse (led.expanded (3.0f));
         }
         g.setColour (theme::textDim);
-        g.setFont (LookAndFeelYD::uiFont (8.5f));
-        g.drawText ("MIDI", (int) led.getX() - 7, (int) led.getBottom() + 1, 26, 10, juce::Justification::centred);
+        g.setFont (LookAndFeelYD::uiFont (8.0f));
+        g.drawText ("MIDI", (int) led.getX() - 8, (int) led.getBottom() + 1, 26, 9, juce::Justification::centred);
     }
 
     void resized() override
@@ -230,29 +262,66 @@ public:
         const int h = getHeight();
         const int bh = 26, y = (h - bh) / 2;
 
-        int x = 168;
+        int x = 156;
         for (int i = 0; i < kNumTabs; ++i)
         {
-            tabs[i]->setBounds (x, 6, i == 4 ? 74 : 62, h - 12);
-            x += (i == 4 ? 74 : 62) + 3;
+            const int w = i == 4 ? 70 : 58;
+            tabs[i]->setBounds (x, 6, w, h - 12);
+            x += w + 3;
         }
 
-        prevButton.setBounds (528, y, 26, bh);
-        presetButton.setBounds (557, y, 196, bh);
-        nextButton.setBounds (756, y, 26, bh);
+        prevButton.setBounds (474, y, 24, bh);
+        presetButton.setBounds (501, y, 186, bh);
+        nextButton.setBounds (690, y, 24, bh);
 
-        saveButton.setBounds (794, y, 52, bh);
-        initButton.setBounds (849, y, 46, bh);
-        randButton.setBounds (898, y, 52, bh);
+        modeLabel.setBounds (722, y + 1, 56, bh - 2);
 
-        meter.setBounds (getWidth() - 76, (h - 22) / 2, 64, 22);
-        statusLabel.setBounds (getWidth() - 232, 0, 148, h);
+        saveButton.setBounds (786, y, 46, bh);
+        initButton.setBounds (835, y, 42, bh);
+        randButton.setBounds (880, y, 46, bh);
+        randMenuButton.setBounds (927, y, 18, bh);
+        undoButton.setBounds (948, y, 28, bh);
+
+        meter.setBounds (getWidth() - 70, (h - 22) / 2, 58, 22);
+        statusLabel.setBounds (getWidth() - 216, 0, 112, h);
     }
 
 private:
     juce::Rectangle<float> midiLedBounds() const
     {
-        return { (float) getWidth() - 96.0f, getHeight() * 0.5f - 9.0f, 10.0f, 10.0f };
+        return { (float) getWidth() - 88.0f, getHeight() * 0.5f - 9.0f, 10.0f, 10.0f };
+    }
+
+    void showRandMenu()
+    {
+        auto& pm = processor.getPresetManager();
+        juce::PopupMenu m;
+        m.addSectionHeader ("Randomize strength");
+        m.addItem (1, "Subtle - vary the current sound");
+        m.addItem (2, "Normal - new musical patch");
+        m.addItem (3, "Wild - experimental (safe)");
+        m.addSeparator();
+        m.addSectionHeader ("Section locks");
+        const char* lockNames[] = { "Lock OSC / SUB / NOISE", "Lock FILTER", "Lock ENVELOPES",
+                                    "Lock LFO / MATRIX", "Lock FX" };
+        for (int i = 0; i < ydc::PresetManager::NumLocks; ++i)
+            m.addItem (10 + i, lockNames[i], true, pm.isSectionLocked ((ydc::PresetManager::Section) i));
+
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (randMenuButton),
+            [this, &pm] (int result)
+            {
+                if (result >= 1 && result <= 3)
+                {
+                    using S = ydc::PresetManager::Strength;
+                    pm.randomizePatch (result == 1 ? S::Subtle : result == 3 ? S::Wild : S::Normal);
+                    refreshPresetName();
+                }
+                else if (result >= 10 && result < 10 + ydc::PresetManager::NumLocks)
+                {
+                    const auto s = (ydc::PresetManager::Section) (result - 10);
+                    pm.setSectionLocked (s, ! pm.isSectionLocked (s));
+                }
+            });
     }
 
     void timerCallback() override
@@ -267,13 +336,16 @@ private:
         statusLabel.setText ("CPU " + juce::String (cpu) + "%  VOX "
                              + juce::String (processor.getEngine().getActiveVoiceCount()),
                              juce::dontSendNotification);
+        const int mode = (int) processor.getApvts().getRawParameterValue ("playMode")->load();
+        modeLabel.setText (mode == 0 ? "POLY" : mode == 1 ? "MONO" : "LEGATO", juce::dontSendNotification);
         refreshPresetName();
     }
 
     YDCoreAudioProcessor& processor;
     std::unique_ptr<TabButton> tabs[kNumTabs];
-    juce::TextButton presetButton, prevButton, nextButton, saveButton, initButton, randButton;
-    juce::Label statusLabel;
+    juce::TextButton presetButton, prevButton, nextButton, saveButton, initButton, randButton,
+                     randMenuButton, undoButton;
+    juce::Label statusLabel, modeLabel;
     OutputMeter meter;
     bool midiLit = false;
 };
