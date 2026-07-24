@@ -1,4 +1,4 @@
-name: Windows Build v4 (GLOBUS + Installer)
+name: GLOBUS CI (Windows x64)
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   windows:
-    name: Windows x64 (build, test, installer)
+    name: Build, sign (when available), install-test, publish
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -40,6 +40,57 @@ jobs:
           & "build/YDCoreTests_artefacts/Release/YDCoreTests.exe" 2>&1 | Tee-Object -FilePath tests.log
           exit $LASTEXITCODE
 
+      # ------------------------------------------------------------------
+      # Code signing (Azure Trusted Signing) — runs ONLY when the repository
+      # has the required encrypted secrets configured. Without them the build
+      # continues and every artifact is clearly labeled as unsigned.
+      # No certificates, keys or passwords are ever committed to the repo.
+      # ------------------------------------------------------------------
+      - name: Detect signing credentials
+        id: signcheck
+        shell: pwsh
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ACS_ENDPOINT: ${{ secrets.ACS_ENDPOINT }}
+          ACS_ACCOUNT: ${{ secrets.ACS_ACCOUNT }}
+          ACS_PROFILE: ${{ secrets.ACS_PROFILE }}
+        run: |
+          $vars = @($env:AZURE_TENANT_ID, $env:AZURE_CLIENT_ID, $env:AZURE_CLIENT_SECRET,
+                    $env:ACS_ENDPOINT, $env:ACS_ACCOUNT, $env:ACS_PROFILE)
+          $available = -not ($vars | Where-Object { [string]::IsNullOrEmpty($_) })
+          "available=$($available.ToString().ToLower())" | Out-File $env:GITHUB_OUTPUT -Append
+          Write-Host "Signing credentials available: $available"
+
+      - name: Sign plugin binaries (Azure Trusted Signing)
+        if: steps.signcheck.outputs.available == 'true'
+        uses: azure/trusted-signing-action@v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.ACS_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.ACS_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.ACS_PROFILE }}
+          files: |
+            ${{ github.workspace }}\build\YDCore_artefacts\Release\VST3\GLOBUS.vst3\Contents\x86_64-win\GLOBUS.vst3
+            ${{ github.workspace }}\build\YDCore_artefacts\Release\Standalone\GLOBUS.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify binary signatures
+        if: steps.signcheck.outputs.available == 'true'
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+                      Sort-Object FullName -Descending | Select-Object -First 1
+          & $signtool.FullName verify /pa /all /v "build/YDCore_artefacts/Release/VST3/GLOBUS.vst3/Contents/x86_64-win/GLOBUS.vst3" 2>&1 | Tee-Object -FilePath signing.log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $signtool.FullName verify /pa /all /v "build/YDCore_artefacts/Release/Standalone/GLOBUS.exe" 2>&1 | Tee-Object -Append -FilePath signing.log
+          exit $LASTEXITCODE
+
       - name: Generate installer artwork
         shell: pwsh
         run: |
@@ -67,6 +118,31 @@ jobs:
           & $iscc "installer\GLOBUS-Installer.iss" 2>&1 | Tee-Object -Append -FilePath iscc.log
           exit $LASTEXITCODE
 
+      - name: Sign installer (Azure Trusted Signing)
+        if: steps.signcheck.outputs.available == 'true'
+        uses: azure/trusted-signing-action@v0.5.1
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.ACS_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.ACS_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.ACS_PROFILE }}
+          files: |
+            ${{ github.workspace }}\installer\Output\GLOBUS-Installer-Windows-x64.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify installer signature
+        if: steps.signcheck.outputs.available == 'true'
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" |
+                      Sort-Object FullName -Descending | Select-Object -First 1
+          & $signtool.FullName verify /pa /all /v "installer/Output/GLOBUS-Installer-Windows-x64.exe" 2>&1 | Tee-Object -Append -FilePath signing.log
+          exit $LASTEXITCODE
+
       - name: Test installer (silent install, verify, uninstall)
         shell: pwsh
         run: |
@@ -78,7 +154,6 @@ jobs:
             if (-not $cond) { $script:fails++ }
           }
 
-          # ---- silent install
           $p = Start-Process -FilePath "installer\Output\GLOBUS-Installer-Windows-x64.exe" `
                 -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/LOG=install.log" -Wait -PassThru
           Check "silent install exit code 0" ($p.ExitCode -eq 0)
@@ -90,22 +165,18 @@ jobs:
           Check "VST3 moduleinfo.json installed" (Test-Path $mod)
           Check "Standalone installed" (Test-Path $sa)
 
-          # installed VST3 is byte-identical to the freshly built one
           $h1 = (Get-FileHash "build/YDCore_artefacts/Release/VST3/GLOBUS.vst3/Contents/x86_64-win/GLOBUS.vst3").Hash
           $h2 = (Get-FileHash $vst3).Hash
           Check "installed VST3 hash matches build" ($h1 -eq $h2)
 
-          # vendor branding present in the installed plugin metadata
           $vendorOk = (Get-Content $mod -Raw) -match "Ninth Parallel Audio"
           Check "installed moduleinfo carries Ninth Parallel Audio vendor" $vendorOk
 
-          # standalone launches and stays alive
           $proc = Start-Process -FilePath $sa -PassThru
           Start-Sleep -Seconds 8
           Check "Standalone launches and keeps running" (-not $proc.HasExited)
           if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
 
-          # user presets must survive uninstall
           $presetDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "GLOBUS\Presets"
           New-Item -ItemType Directory -Force -Path $presetDir | Out-Null
           '{"name":"CI Survival","category":"User","params":{}}' | Out-File "$presetDir\CI_Survival.json" -Encoding utf8
@@ -113,7 +184,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path $legacyDir | Out-Null
           '{"name":"Legacy Survival","category":"User","params":{}}' | Out-File "$legacyDir\Legacy_Survival.json" -Encoding utf8
 
-          # ---- silent uninstall
           $unins = Get-ChildItem "C:\Program Files\Ninth Parallel Audio\GLOBUS\unins*.exe" | Select-Object -First 1
           Check "uninstaller registered in app folder" ($null -ne $unins)
           if ($null -ne $unins) {
@@ -130,14 +200,17 @@ jobs:
           Get-Content $log
           if ($script:fails -gt 0) { exit 1 }
 
-      - name: Package artifacts
+      - name: Package artifacts + SHA-256 checksums
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path "build/YDCore_artefacts/Release/VST3/GLOBUS.vst3" -DestinationPath "dist/GLOBUS-VST3-Windows-x64.zip"
           Compress-Archive -Path "build/YDCore_artefacts/Release/Standalone/GLOBUS.exe" -DestinationPath "dist/GLOBUS-Standalone-Windows-x64.zip"
           Copy-Item "installer/Output/GLOBUS-Installer-Windows-x64.exe" "dist/"
-          Get-ChildItem dist
+          Get-FileHash dist/* -Algorithm SHA256 | ForEach-Object {
+            "$($_.Hash)  $(Split-Path $_.Path -Leaf)"
+          } | Out-File "dist/SHA256SUMS.txt" -Encoding ascii
+          Get-Content "dist/SHA256SUMS.txt"
 
       - name: Upload VST3
         uses: actions/upload-artifact@v4
@@ -157,20 +230,33 @@ jobs:
           name: GLOBUS-Installer-Windows-x64
           path: dist/GLOBUS-Installer-Windows-x64.exe
 
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: SHA256SUMS
+          path: dist/SHA256SUMS.txt
+
       - name: Publish binaries to the rolling release
         if: github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          SIGNED: ${{ steps.signcheck.outputs.available }}
         run: |
+          $signNote = if ($env:SIGNED -eq 'true') {
+            "Binaries and installer are Authenticode-signed (SHA-256, RFC 3161 timestamp)."
+          } else {
+            "UNSIGNED DEVELOPMENT BUILD: binaries and installer carry no Authenticode signature yet, so Windows SmartScreen will show an Unknown Publisher warning. See docs/SIGNING.md for the signing setup."
+          }
           gh release delete ci-latest --yes --cleanup-tag 2>$null
           if ($LASTEXITCODE -ne 0) { Write-Host "no previous ci-latest release" }
           gh release create ci-latest `
             "dist/GLOBUS-Installer-Windows-x64.exe" `
             "dist/GLOBUS-VST3-Windows-x64.zip" `
             "dist/GLOBUS-Standalone-Windows-x64.zip" `
+            "dist/SHA256SUMS.txt" `
             --title "GLOBUS 1.1.0 - Windows x64 (CI build)" `
-            --notes "Automated Windows x64 Release build by Ninth Parallel Audio. Easiest install: run GLOBUS-Installer-Windows-x64.exe (installs the VST3 to Common Files\VST3 and the Standalone app, with Start Menu shortcut and uninstaller; user presets are never touched). Manual install: unzip GLOBUS-VST3-Windows-x64.zip and copy 'GLOBUS.vst3' to C:\Program Files\Common Files\VST3, then rescan plugins in FL Studio. Commit ${{ github.sha }}."
+            --notes "Automated Windows x64 Release build by Ninth Parallel Audio. Easiest install: run GLOBUS-Installer-Windows-x64.exe (VST3 to Common Files\VST3, Standalone app, Start Menu shortcut, uninstaller; user presets are never touched). Manual install: unzip GLOBUS-VST3-Windows-x64.zip and copy 'GLOBUS.vst3' to C:\Program Files\Common Files\VST3, then rescan plugins in FL Studio. Verify downloads against SHA256SUMS.txt. $signNote Commit ${{ github.sha }}."
           exit 0
 
       - name: Publish debug logs on failure
@@ -182,7 +268,7 @@ jobs:
           gh release delete ci-debug --yes --cleanup-tag 2>$null
           if ($LASTEXITCODE -ne 0) { Write-Host "no previous ci-debug release" }
           $files = @()
-          foreach ($f in @("configure.log", "build.log", "tests.log", "iscc.log", "install.log", "installer-test.log")) {
+          foreach ($f in @("configure.log", "build.log", "tests.log", "iscc.log", "install.log", "installer-test.log", "signing.log")) {
             if (Test-Path $f) { $files += $f }
           }
           if ($files.Count -eq 0) { "no logs captured" | Out-File nolog.txt; $files = @("nolog.txt") }
