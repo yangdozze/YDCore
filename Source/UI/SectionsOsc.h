@@ -2,13 +2,14 @@
 #pragma once
 #include "Controls.h"
 #include "WaveformDisplay.h"
+#include "../Presets/PresetManager.h"
 
 namespace ydc
 {
 class OscSection : public SectionPanel
 {
 public:
-    OscSection (juce::AudioProcessorValueTreeState& apvts, int oscNum)
+    OscSection (juce::AudioProcessorValueTreeState& apvts, int oscNum, PresetManager* pmForLock = nullptr)
         : SectionPanel ("OSCILLATOR " + juce::String (oscNum),
                         oscNum == 1 ? theme::accent : theme::accent2),
           on ("ON"), wave ("", false),
@@ -27,6 +28,15 @@ public:
         addAndMakeVisible (wave);
         addAndMakeVisible (randPhase);
         addAndMakeVisible (display);
+
+        if (pmForLock != nullptr)
+        {
+            lock = std::make_unique<LockButton> (
+                [pmForLock] { return pmForLock->isSectionLocked (PresetManager::LockOsc); },
+                [pmForLock] (bool v) { pmForLock->setSectionLocked (PresetManager::LockOsc, v); },
+                "oscillator/sub/noise");
+            addAndMakeVisible (*lock);
+        }
 
         on.attach (apvts, ids::osc (oscNum, "On"));
         wave.attach (apvts, ids::osc (oscNum, "Wave"));
@@ -47,25 +57,25 @@ public:
     void resized() override
     {
         auto c = content();
-        // header row next to the title
-        on.setBounds (150, 3, 52, 20);
-        wave.setBounds (206, 3, 116, 20);
-        randPhase.setBounds (330, 3, 72, 20);
+        // header row: ON, wave selector, random phase, optional lock
+        on.setBounds (118, 2, 48, 18);
+        wave.setBounds (170, 1, 112, 20);
+        randPhase.setBounds (288, 2, 70, 18);
+        if (lock != nullptr)
+            lock->setBounds (getWidth() - 26, 2, 20, 18);
 
-        auto body = c.withTrimmedTop (4);
-        display.setBounds (body.removeFromRight (158));
-        body.removeFromRight (6);
+        auto body = c.withTrimmedTop (2);
+        display.setBounds (body.removeFromRight (150));
+        body.removeFromRight (5);
 
         const int rowH = body.getHeight() / 2;
         auto row1 = body.removeFromTop (rowH);
-        auto row2 = body;
-
         Knob* top[]    = { &oct, &semi, &fine, &level, &pan, &pw };
         Knob* bottom[] = { &uni, &det, &spread, &drift, &phase };
-        auto cells1 = rowCells (row1, 6, 4);
+        auto cells1 = rowCells (row1, 6, 3);
         for (size_t i = 0; i < 6; ++i)
             top[i]->setBounds (cells1[i]);
-        auto cells2 = rowCells (row2, 6, 4);   // 6 cells keeps columns aligned; last stays empty
+        auto cells2 = rowCells (body, 6, 3);
         for (size_t i = 0; i < 5; ++i)
             bottom[i]->setBounds (cells2[i]);
     }
@@ -76,62 +86,78 @@ private:
     Knob oct, semi, fine, level, pan, pw, uni, det, spread, drift, phase;
     Toggle randPhase;
     WaveformDisplay display;
+    std::unique_ptr<LockButton> lock;
 };
 
 //==============================================================================
-class SubNoiseSection : public SectionPanel
+class SubSection : public SectionPanel
 {
 public:
-    explicit SubNoiseSection (juce::AudioProcessorValueTreeState& apvts)
-        : SectionPanel ("SUB / NOISE"),
-          subOn ("SUB"), subWave ("", false), subLevel ("SUB LVL"),
-          noiseType ("", false), noiseLevel ("NOISE LVL"), noiseTone ("TONE")
+    explicit SubSection (juce::AudioProcessorValueTreeState& apvts)
+        : SectionPanel ("SUB"),
+          on ("ON"), wave ("", false), level ("LEVEL"), pan ("PAN")
     {
-        addAndMakeVisible (subOn);
-        addAndMakeVisible (subWave);
-        addAndMakeVisible (subLevel);
-        addAndMakeVisible (noiseType);
-        addAndMakeVisible (noiseLevel);
-        addAndMakeVisible (noiseTone);
-
-        subOn.attach (apvts, ids::subOn);
-        subWave.attach (apvts, ids::subWave);
-        subLevel.attach (apvts, ids::subLevel);
-        noiseType.attach (apvts, ids::noiseType);
-        noiseLevel.attach (apvts, ids::noiseLevel);
-        noiseTone.attach (apvts, ids::noiseTone);
-        noiseLevel.setAccent (theme::accent2);
-        noiseTone.setAccent (theme::accent2);
-    }
-
-    void paint (juce::Graphics& g) override
-    {
-        SectionPanel::paint (g);
-        g.setColour (theme::outline);
-        const auto c = content();
-        g.drawVerticalLine (c.getCentreX() - 30, (float) c.getY() + 4.0f, (float) c.getBottom() - 4.0f);
+        addAndMakeVisible (on);
+        addAndMakeVisible (wave);
+        addAndMakeVisible (level);
+        addAndMakeVisible (pan);
+        on.attach (apvts, ids::subOn);
+        wave.attach (apvts, ids::subWave);
+        level.attach (apvts, ids::subLevel);
+        pan.attach (apvts, ids::subPan);
     }
 
     void resized() override
     {
         auto c = content();
-        const int knobW = 58;
-        subOn.setBounds (c.getX(), c.getCentreY() - 10, 54, 20);
-        subWave.setBounds (c.getX() + 58, c.getCentreY() - 11, 84, 22);
-        subLevel.setBounds (c.getX() + 152, c.getY(), knobW, c.getHeight());
-
-        const int nx = c.getCentreX() - 16;
-        noiseType.setBounds (nx, c.getCentreY() - 11, 84, 22);
-        noiseLevel.setBounds (nx + 92, c.getY(), knobW, c.getHeight());
-        noiseTone.setBounds (nx + 92 + knobW + 8, c.getY(), knobW, c.getHeight());
+        on.setBounds (52, 2, 46, 18);
+        wave.setBounds (c.getX(), c.getY() + c.getHeight() / 2 - 11, 82, 22);
+        auto knobs = c.withTrimmedLeft (88);
+        auto cells = rowCells (knobs, 2, 3);
+        level.setBounds (cells[0]);
+        pan.setBounds (cells[1]);
     }
 
 private:
-    Toggle subOn;
-    Selector subWave;
-    Knob subLevel;
-    Selector noiseType;
-    Knob noiseLevel, noiseTone;
+    Toggle on;
+    Selector wave;
+    Knob level, pan;
+};
+
+//==============================================================================
+class NoiseSection : public SectionPanel
+{
+public:
+    explicit NoiseSection (juce::AudioProcessorValueTreeState& apvts)
+        : SectionPanel ("NOISE", theme::accent2),
+          type ("", false), level ("LEVEL"), tone ("TONE"), pan ("PAN")
+    {
+        addAndMakeVisible (type);
+        for (Knob* k : { &level, &tone, &pan })
+        {
+            k->setAccent (theme::accent2);
+            addAndMakeVisible (*k);
+        }
+        type.attach (apvts, ids::noiseType);
+        level.attach (apvts, ids::noiseLevel);
+        tone.attach (apvts, ids::noiseTone);
+        pan.attach (apvts, ids::noisePan);
+    }
+
+    void resized() override
+    {
+        auto c = content();
+        type.setBounds (c.getX(), c.getY() + c.getHeight() / 2 - 11, 78, 22);
+        auto knobs = c.withTrimmedLeft (84);
+        auto cells = rowCells (knobs, 3, 3);
+        level.setBounds (cells[0]);
+        tone.setBounds (cells[1]);
+        pan.setBounds (cells[2]);
+    }
+
+private:
+    Selector type;
+    Knob level, tone, pan;
 };
 
 } // namespace ydc
