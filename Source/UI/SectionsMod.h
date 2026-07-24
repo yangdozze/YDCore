@@ -1,14 +1,15 @@
-// GLOBUS — filter, envelope, LFO and modulation-matrix section components.
+// GLOBUS — filter, envelope and LFO section components.
 #pragma once
 #include "Controls.h"
 #include "EnvelopeDisplay.h"
+#include "../Presets/PresetManager.h"
 
 namespace ydc
 {
 class FilterSection : public SectionPanel
 {
 public:
-    explicit FilterSection (juce::AudioProcessorValueTreeState& apvts)
+    explicit FilterSection (juce::AudioProcessorValueTreeState& apvts, PresetManager* pmForLock = nullptr)
         : SectionPanel ("FILTER"),
           on ("ON"), type ("", false),
           cutoff ("CUTOFF"), reso ("RESO"), drive ("DRIVE"), key ("KEY TRK"), envAmt ("ENV AMT")
@@ -17,6 +18,15 @@ public:
         addAndMakeVisible (type);
         for (Knob* k : { &cutoff, &reso, &drive, &key, &envAmt })
             addAndMakeVisible (*k);
+
+        if (pmForLock != nullptr)
+        {
+            lock = std::make_unique<LockButton> (
+                [pmForLock] { return pmForLock->isSectionLocked (PresetManager::LockFilter); },
+                [pmForLock] (bool v) { pmForLock->setSectionLocked (PresetManager::LockFilter, v); },
+                "filter");
+            addAndMakeVisible (*lock);
+        }
 
         on.attach (apvts, ids::filterOn);
         type.attach (apvts, ids::filterType);
@@ -31,11 +41,13 @@ public:
     void resized() override
     {
         auto c = content();
-        on.setBounds (78, 3, 50, 20);
-        type.setBounds (130, 3, 92, 20);
+        on.setBounds (66, 2, 48, 18);
+        type.setBounds (118, 1, 90, 20);
+        if (lock != nullptr)
+            lock->setBounds (getWidth() - 26, 2, 20, 18);
 
-        auto area = c.withTrimmedTop (6);
-        cutoff.setBounds (area.removeFromLeft (86));
+        auto area = c.withTrimmedTop (3);
+        cutoff.setBounds (area.removeFromLeft (juce::jmax (72, area.getWidth() / 5)));
         auto cells = rowCells (area, 4, 3);
         Knob* knobs[] = { &reso, &drive, &key, &envAmt };
         for (size_t i = 0; i < 4; ++i)
@@ -46,6 +58,7 @@ private:
     Toggle on;
     Selector type;
     Knob cutoff, reso, drive, key, envAmt;
+    std::unique_ptr<LockButton> lock;
 };
 
 //==============================================================================
@@ -75,9 +88,11 @@ public:
     void resized() override
     {
         auto c = content().withTrimmedTop (4);
-        display.setBounds (c.removeFromRight (juce::jmax (80, c.getWidth() * 32 / 100)));
-        c.removeFromRight (4);
-        auto cells = rowCells (c, 4, 3);
+        display.setBounds (c.removeFromRight (juce::jmax (80, c.getWidth() * 42 / 100)));
+        c.removeFromRight (6);
+        // compact knob strip, vertically centred beside the full-height graph
+        auto strip = c.withSizeKeepingCentre (c.getWidth(), juce::jmin (c.getHeight(), 128));
+        auto cells = rowCells (strip, 4, 4);
         Knob* knobs[] = { &a, &d, &s, &r };
         for (size_t i = 0; i < 4; ++i)
             knobs[i]->setBounds (cells[i]);
@@ -117,12 +132,13 @@ public:
     void resized() override
     {
         auto c = content().withTrimmedTop (2);
-        auto bottom = c.removeFromBottom (juce::jmax (24, c.getHeight() * 32 / 100));
-        dest.setBounds (bottom.removeFromLeft (128).withSizeKeepingCentre (128, 24));
-        bottom.removeFromLeft (6);
-        display.setBounds (bottom);
-
-        auto cells = rowCells (c.withTrimmedBottom (2), 5, 3);
+        display.setBounds (c.removeFromRight (juce::jmax (80, c.getWidth() * 42 / 100)));
+        c.removeFromRight (6);
+        auto strip = c.withSizeKeepingCentre (c.getWidth(), juce::jmin (c.getHeight(), 158));
+        auto destRow = strip.removeFromBottom (26);
+        dest.setBounds (destRow.withSizeKeepingCentre (juce::jmin (170, destRow.getWidth()), 24));
+        strip.removeFromBottom (2);
+        auto cells = rowCells (strip, 5, 4);
         Knob* knobs[] = { &a, &d, &s, &r, &amt };
         for (size_t i = 0; i < 5; ++i)
             knobs[i]->setBounds (cells[i]);
@@ -172,6 +188,7 @@ public:
     void resized() override
     {
         auto c = content().withTrimmedTop (2);
+        c = c.withSizeKeepingCentre (c.getWidth(), juce::jmin (c.getHeight(), 170));
 
         auto selCol = c.removeFromLeft (86);
         wave.setBounds (selCol.removeFromTop (34));
