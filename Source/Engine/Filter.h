@@ -63,7 +63,9 @@ public:
 
                 float out = tick (s1, v0, a1, a2, a3, k);
 
-                if (type == FilterType::LP24 || type == FilterType::HP24)
+                if (type == FilterType::LP24 || type == FilterType::HP24
+                    || type == FilterType::BP24 || type == FilterType::Ladder24
+                    || type == FilterType::Ota24)
                     out = tick (s2, out, b1, b2, b3, k2);
 
                 x[i] = sanitize (out);
@@ -88,8 +90,14 @@ private:
             case FilterType::LP24:  return v2;
             case FilterType::HP12:
             case FilterType::HP24:  return v0 - damp * v1 - v2;
-            case FilterType::BP12:  return v1;
+            case FilterType::BP12:
+            case FilterType::BP24:  return v1;
             case FilterType::Notch: return v0 - damp * v1;
+            // v1.2 models are rendered by FilterHQ; if they ever reach this legacy
+            // core (LEGACY quality), they resolve to the closest classic response.
+            case FilterType::Ladder24:
+            case FilterType::Ota24:
+            case FilterType::Sem12: return v2;
             default:                return v2;
         }
     }

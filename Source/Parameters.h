@@ -13,7 +13,9 @@ namespace choices
     inline const juce::StringArray oscWaves      { "Sine", "Triangle", "Saw", "Square", "Pulse", "SuperSaw", "Noise" };
     inline const juce::StringArray subWaves      { "Sine", "Square" };
     inline const juce::StringArray noiseTypes    { "White", "Pink" };
-    inline const juce::StringArray filterTypes   { "LP 12", "LP 24", "HP 12", "HP 24", "BP 12", "Notch" };
+    // v1.2: four models APPENDED — legacy indices 0..5 are frozen save-format values.
+    inline const juce::StringArray filterTypes   { "LP 12", "LP 24", "HP 12", "HP 24", "BP 12", "Notch",
+                                                   "Ladder 24", "OTA 24", "SEM 12", "BP 24" };
     inline const juce::StringArray lfoWaves      { "Sine", "Triangle", "Saw", "Square", "S&H" };
     inline const juce::StringArray lfoDivisions  { "1/1", "1/2", "1/2T", "1/4", "1/4T", "1/8", "1/8T", "1/16", "1/16T", "1/32" };
     inline const juce::StringArray delayDivisions{ "1/2", "1/4D", "1/4", "1/4T", "1/8D", "1/8", "1/8T", "1/16" };
@@ -21,12 +23,22 @@ namespace choices
     inline const juce::StringArray arpModes      { "Up", "Down", "Up/Down", "Random" };
     inline const juce::StringArray playModes     { "Poly", "Mono", "Legato" };
     inline const juce::StringArray notePriorities{ "Last", "High", "Low" };
-    inline const juce::StringArray lfoDests      { "Off", "Pitch 1+2", "Osc 1 Pitch", "Osc 2 Pitch", "Filter Cutoff", "Amp Level", "Pan", "PW 1+2", "FX Mix" };
+    // v1.2: "WT Pos 1+2" APPENDED.
+    inline const juce::StringArray lfoDests      { "Off", "Pitch 1+2", "Osc 1 Pitch", "Osc 2 Pitch", "Filter Cutoff", "Amp Level", "Pan", "PW 1+2", "FX Mix",
+                                                   "WT Pos 1+2" };
     inline const juce::StringArray modEnvDests   { "Off", "Pitch 1+2", "Osc 1 Pitch", "Osc 2 Pitch", "Osc 1 PW", "Osc 2 PW", "Filter Cutoff", "LFO 1 Rate", "LFO 2 Rate", "Noise Level" };
     inline const juce::StringArray modSources    { "Off", "Velocity", "Mod Wheel", "Aftertouch", "Key Track", "Amp Env", "Filter Env", "Mod Env", "LFO 1", "LFO 2", "Random", "Pitch Bend" };
+    // v1.2: nine destinations APPENDED after "Stereo Width" — never reorder.
     inline const juce::StringArray modDests      { "Off", "Osc 1 Pitch", "Osc 2 Pitch", "Osc 1+2 Pitch", "Osc 1 Fine", "Osc 2 Fine",
                                                    "Osc 1 Level", "Osc 2 Level", "Osc 1 Pan", "Osc 2 Pan", "Osc 1 PW", "Osc 2 PW",
-                                                   "Filter Cutoff", "Filter Reso", "Amp Level", "LFO 1 Rate", "LFO 2 Rate", "FX Mix", "Stereo Width" };
+                                                   "Filter Cutoff", "Filter Reso", "Amp Level", "LFO 1 Rate", "LFO 2 Rate", "FX Mix", "Stereo Width",
+                                                   "Osc 1 WT Pos", "Osc 2 WT Pos", "Osc 1 Warp", "Osc 2 Warp",
+                                                   "Osc 1 Detune", "Osc 2 Detune", "Osc 1 Spread", "Osc 2 Spread", "Filter Drive" };
+
+    // v1.2 additions (new lists — purely appended functionality)
+    inline const juce::StringArray oscEngines    { "Legacy", "Basic HQ", "Wavetable" };
+    inline const juce::StringArray warpModes     { "Off", "Bend +", "Bend -", "Sync", "Asymmetry", "Mirror" };
+    inline const juce::StringArray qualityModes  { "Legacy", "Eco", "High", "Ultra" };
 
     // Beats per step for the tempo-sync division lists above (1 beat = quarter note)
     inline constexpr float lfoDivBeats[]   = { 4.0f, 2.0f, 4.0f/3.0f, 1.0f, 2.0f/3.0f, 0.5f, 1.0f/3.0f, 0.25f, 1.0f/6.0f, 0.125f };
@@ -34,18 +46,24 @@ namespace choices
     inline constexpr float arpDivBeats[]   = { 1.0f, 2.0f/3.0f, 0.5f, 1.0f/3.0f, 0.25f, 1.0f/6.0f, 0.125f };
 }
 
-// Enum mirrors of the choice lists (indices must match)
+// Enum mirrors of the choice lists (indices must match; v1.2 entries appended)
 enum class OscWave    { Sine, Triangle, Saw, Square, Pulse, SuperSaw, Noise };
-enum class FilterType { LP12, LP24, HP12, HP24, BP12, Notch };
+enum class FilterType { LP12, LP24, HP12, HP24, BP12, Notch, Ladder24, Ota24, Sem12, BP24 };
 enum class LfoWave    { Sine, Triangle, Saw, Square, SampleHold };
 enum class PlayMode   { Poly, Mono, Legato };
 enum class ArpMode    { Up, Down, UpDown, Random };
 
 enum class ModSource  { Off, Velocity, ModWheel, Aftertouch, KeyTrack, AmpEnv, FilterEnv, ModEnv, Lfo1, Lfo2, Random, PitchBend, Count };
 enum class ModDest    { Off, Osc1Pitch, Osc2Pitch, OscAllPitch, Osc1Fine, Osc2Fine, Osc1Level, Osc2Level, Osc1Pan, Osc2Pan,
-                        Osc1PW, Osc2PW, Cutoff, Reso, AmpLevel, Lfo1Rate, Lfo2Rate, FxMix, StereoWidth, Count };
-enum class LfoDest    { Off, PitchAll, Osc1Pitch, Osc2Pitch, Cutoff, AmpLevel, Pan, PWAll, FxMix };
+                        Osc1PW, Osc2PW, Cutoff, Reso, AmpLevel, Lfo1Rate, Lfo2Rate, FxMix, StereoWidth,
+                        Osc1WtPos, Osc2WtPos, Osc1Warp, Osc2Warp, Osc1Detune, Osc2Detune, Osc1Spread, Osc2Spread, FilterDrive, Count };
+enum class LfoDest    { Off, PitchAll, Osc1Pitch, Osc2Pitch, Cutoff, AmpLevel, Pan, PWAll, FxMix, WtPosAll };
 enum class ModEnvDest { Off, PitchAll, Osc1Pitch, Osc2Pitch, Osc1PW, Osc2PW, Cutoff, Lfo1Rate, Lfo2Rate, NoiseLevel };
+
+// v1.2 enums
+enum class OscEngine   { Legacy, BasicHQ, Wavetable };
+enum class WarpMode    { Off, BendPlus, BendMinus, Sync, Asymmetry, Mirror };
+enum class QualityMode { Legacy, Eco, High, Ultra };
 
 //==============================================================================
 // Parameter IDs
@@ -134,6 +152,13 @@ namespace ids
     inline constexpr const char* eqLow  = "eqLow";
     inline constexpr const char* eqMid  = "eqMid";
     inline constexpr const char* eqHigh = "eqHigh";
+
+    // ---- v1.2 additions (APPENDED to the layout — never insert before these) ----
+    // per-oscillator engine & wavetable controls: osc(i,"Engine"|"WtPos"|"WarpMode"|"WarpAmt")
+    inline constexpr const char* qualityMode = "qualityMode";
+    inline constexpr const char* ampCurveA = "ampAttackCurve";  inline constexpr const char* ampCurveD = "ampDecayCurve";  inline constexpr const char* ampCurveR = "ampReleaseCurve";
+    inline constexpr const char* filCurveA = "filtAttackCurve"; inline constexpr const char* filCurveD = "filtDecayCurve"; inline constexpr const char* filCurveR = "filtReleaseCurve";
+    inline constexpr const char* modCurveA = "modAttackCurve";  inline constexpr const char* modCurveD = "modDecayCurve";  inline constexpr const char* modCurveR = "modReleaseCurve";
 }
 
 //==============================================================================
@@ -143,8 +168,11 @@ struct OscRefs
 {
     std::atomic<float> *on, *wave, *oct, *semi, *fine, *level, *pan, *pw,
                        *phase, *randPhase, *uniCount, *uniDetune, *uniSpread, *drift;
+    // v1.2
+    std::atomic<float> *engine, *wtPos, *warpMode, *warpAmt;
 };
-struct EnvRefs  { std::atomic<float> *a, *d, *s, *r; };
+struct EnvRefs  { std::atomic<float> *a, *d, *s, *r;
+                  std::atomic<float> *curveA, *curveD, *curveR; };   // v1.2 (0 = legacy shape)
 struct LfoRefs  { std::atomic<float> *wave, *rate, *sync, *div, *fade, *phase, *bipolar, *retrig, *dest, *amount; };
 struct SlotRefs { std::atomic<float> *src, *dst, *amt, *bipolar; };
 
@@ -172,6 +200,9 @@ struct ParamRefs
     std::atomic<float> *dlyOn, *dlyTime, *dlySync, *dlyDiv, *dlyFb, *dlyTone, *dlyMix;
     std::atomic<float> *rvOn, *rvSize, *rvDamp, *rvWidth, *rvMix;
     std::atomic<float> *eqOn, *eqLow, *eqMid, *eqHigh;
+
+    // v1.2
+    std::atomic<float> *qualityMode;
 };
 
 /** Builds the full APVTS layout (all ~145 automatable parameters). */

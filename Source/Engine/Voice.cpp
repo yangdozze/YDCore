@@ -6,9 +6,12 @@ void Voice::prepare (double sampleRate)
 {
     sr = sampleRate;
     for (auto& o : osc) o.prepare (sampleRate);
+    for (auto& o : oscHq) o.prepare (sampleRate);
+    for (auto& o : oscWt) o.prepare (sampleRate);
     sub.prepare (sampleRate);
     noise.prepare (sampleRate);
     filter.prepare (sampleRate);
+    filterHq.prepare (sampleRate);
     ampEnv.prepare (sampleRate);
     filEnv.prepare (sampleRate);
     modEnv.prepare (sampleRate);
@@ -25,6 +28,7 @@ void Voice::reset()
     filEnv.reset();
     modEnv.reset();
     filter.reset();
+    filterHq.reset();
     ampModPrev = 1.0f;
 }
 
@@ -62,6 +66,23 @@ void Voice::startNote (const ParamRefs& params, int midiNote, float vel, uint32_
         osc[i].reset (rng,
                       params.osc[(size_t) i].randPhase->load() > 0.5f,
                       params.osc[(size_t) i].phase->load());
+
+    // v1.2 engines use a DERIVED rng so the legacy random sequence (sub/noise/LFO
+    // seeds below) stays byte-identical for old presets.
+    {
+        Rng hqRng;
+        hqRng.seed (seed * 2654435761u ^ 0x1F123BB5u);
+        for (int i = 0; i < 2; ++i)
+        {
+            const bool rnd = params.osc[(size_t) i].randPhase->load() > 0.5f;
+            const float ph = params.osc[(size_t) i].phase->load();
+            oscHq[i].reset (hqRng, rnd, ph);
+            oscWt[i].reset (hqRng, rnd, ph);
+            wtPosState[i] = clampf (params.osc[(size_t) i].wtPos->load(), 0.0f, 1.0f);
+            warpState[i]  = clampf (params.osc[(size_t) i].warpAmt->load(), 0.0f, 1.0f);
+        }
+    }
+
     sub.reset (rng);
     noise.reset (rng);
 
@@ -137,6 +158,9 @@ void Voice::renderChunk (float* L, float* R, int absStart, int n, const RenderCo
     ampEnv.setParams (P.amp.a->load(), P.amp.d->load(), P.amp.s->load(), P.amp.r->load());
     filEnv.setParams (P.fil.a->load(), P.fil.d->load(), P.fil.s->load(), P.fil.r->load());
     modEnv.setParams (P.mod.a->load(), P.mod.d->load(), P.mod.s->load(), P.mod.r->load());
+    ampEnv.setCurves (P.amp.curveA->load(), P.amp.curveD->load(), P.amp.curveR->load());
+    filEnv.setCurves (P.fil.curveA->load(), P.fil.curveD->load(), P.fil.curveR->load());
+    modEnv.setCurves (P.mod.curveA->load(), P.mod.curveD->load(), P.mod.curveR->load());
 
     // ---- glide
     if (! exactEq (glideRate, 0.0f))
@@ -236,7 +260,35 @@ void Voice::renderChunk (float* L, float* R, int absStart, int n, const RenderCo
                                + mv.pitchSemis[i] + mv.fineSemis[i];
         bp.freqHz = noteToHz (clampf (noteForOsc, -12.0f, 135.0f));
 
-        osc[i].render (tmpL, tmpR, n, bp);
+        const auto engine = (OscEngine) (int) op.engine->load();
+        if (engine == OscEngine::Legacy)
+        {
+            osc[i].render (tmpL, tmpR, n, bp);   // untouched 1.1 path
+        }
+        else
+        {
+            // v1.2 engines respond to the appended modulation destinations
+            bp.detuneCents = clampf (op.uniDetune->load() + mv.detuneAdd[i], 0.0f, 100.0f);
+            bp.spread      = clampf (op.uniSpread->load() + mv.spreadAdd[i], 0.0f, 1.0f);
+
+            if (engine == OscEngine::BasicHQ)
+            {
+                if (ctx.hqShapes != nullptr)
+                    oscHq[i].render (tmpL, tmpR, n, bp, *ctx.hqShapes);
+            }
+            else
+            {
+                HqBlockParams hp;
+                hp.bank     = ctx.wtBank[i];
+                hp.quality  = ctx.quality;
+                hp.warpMode = (WarpMode) (int) op.warpMode->load();
+                const float posT  = clampf (op.wtPos->load()   + mv.wtPosAdd[i], 0.0f, 1.0f);
+                const float warpT = clampf (op.warpAmt->load() + mv.warpAdd[i],  0.0f, 1.0f);
+                hp.posStart  = wtPosState[i];  hp.posEnd  = posT;   wtPosState[i] = posT;
+                hp.warpStart = warpState[i];   hp.warpEnd = warpT;  warpState[i]  = warpT;
+                oscWt[i].render (tmpL, tmpR, n, bp, hp);
+            }
+        }
     }
 
     if (P.subOn->load() > 0.5f)
@@ -259,11 +311,26 @@ void Voice::renderChunk (float* L, float* R, int absStart, int n, const RenderCo
         const float keyOct = P.keyTrack->load() * (currentNote - 60.0f) / 12.0f;
         const float envOct = P.filterEnvAmt->load() * modScale::cutoffOct * filEnv.getLevel();
         const float fc = P.cutoff->load() * std::exp2 (keyOct + envOct + mv.cutoffOct);
-        filter.setParams ((FilterType) (int) P.filterType->load(),
-                          fc,
-                          clampf (P.resonance->load() + mv.resoAdd, 0.0f, 1.0f),
-                          P.filterDrive->load());
-        filter.process (tmpL, tmpR, n);
+        const auto ftype = (FilterType) (int) P.filterType->load();
+        const float res = clampf (P.resonance->load() + mv.resoAdd, 0.0f, 1.0f);
+
+        if (ftype == FilterType::Ladder24 || ftype == FilterType::Ota24 || ftype == FilterType::Sem12)
+        {
+            // v1.2 models (appended choices — unreachable from legacy presets).
+            // Drive responds to the appended Filter Drive mod destination and the
+            // nonlinear cores oversample at HIGH/ULTRA quality.
+            const bool os = ctx.quality == QualityMode::High || ctx.quality == QualityMode::Ultra;
+            filterHq.setParams (ftype, fc,
+                                res,
+                                clampf (P.filterDrive->load() + mv.driveAdd, 0.0f, 1.0f),
+                                os);
+            filterHq.process (tmpL, tmpR, n);
+        }
+        else
+        {
+            filter.setParams (ftype, fc, res, P.filterDrive->load());
+            filter.process (tmpL, tmpR, n);
+        }
     }
 
     // ---- amplitude (per-sample envelope, ramped mod gain)

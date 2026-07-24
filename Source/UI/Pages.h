@@ -7,6 +7,7 @@
 #include "SectionsMod.h"
 #include "SectionsFx.h"
 #include "ModEditor.h"
+#include "WavetableBrowser.h"
 #include "../PluginProcessor.h"
 
 namespace ydc
@@ -19,13 +20,14 @@ class OscPage : public juce::Component
 {
 public:
     explicit OscPage (YDCoreAudioProcessor& p)
-        : osc1 (p.getApvts(), 1, &p.getPresetManager()),
-          osc2 (p.getApvts(), 2),
+        : osc1 (p, 1, &p.getPresetManager()),
+          osc2 (p, 2),
           sub (p.getApvts()),
           noise (p.getApvts()),
           filter (p.getApvts(), &p.getPresetManager()),
           modEditor (p),
-          keyboard (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
+          keyboard (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard),
+          browser1 (p, 1), browser2 (p, 2)
     {
         for (juce::Component* c : { (juce::Component*) &osc1, (juce::Component*) &osc2,
                                     (juce::Component*) &sub, (juce::Component*) &noise,
@@ -34,6 +36,18 @@ public:
             addAndMakeVisible (*c);
         keyboard.setKeyWidth (24.0f);
         keyboard.setLowestVisibleKey (24);
+
+        // wavetable browser overlays: hidden until opened; opening never changes the sound
+        addChildComponent (browser1);
+        addChildComponent (browser2);
+        browser1.onClose = [this] { browser1.setVisible (false); };
+        browser2.onClose = [this] { browser2.setVisible (false); };
+        osc1.onOpenBrowser = [this] { browser2.setVisible (false); browser1.setVisible (true);
+                                      browser1.toFront (true); };
+        osc2.onOpenBrowser = [this] { browser1.setVisible (false); browser2.setVisible (true);
+                                      browser2.toFront (true); };
+        osc1.onStepWavetable = [this] (int d) { browser1.stepSelection (d); };
+        osc2.onStepWavetable = [this] (int d) { browser2.stepSelection (d); };
     }
 
     void resized() override
@@ -49,6 +63,9 @@ public:
         modEditor.setBounds (8, 372, 1184, 268);
 
         keyboard.setBounds (8, 644, 1184, 46);
+
+        browser1.setBounds (250, 90, 700, 430);
+        browser2.setBounds (250, 90, 700, 430);
     }
 
 private:
@@ -58,6 +75,7 @@ private:
     FilterSection filter;
     ModEditor modEditor;
     juce::MidiKeyboardComponent keyboard;
+    WavetableBrowser browser1, browser2;
 };
 
 //==============================================================================
@@ -482,7 +500,7 @@ public:
 
         g.setColour (theme::textDim);
         g.setFont (LookAndFeelYD::uiFont (10.5f));
-        g.drawText ("GLOBUS 1.1.0  |  Ninth Parallel Audio  |  VST3 + Standalone",
+        g.drawText ("GLOBUS 1.2.0  |  Ninth Parallel Audio  |  VST3 + Standalone",
                     c.removeFromTop (rowH), juce::Justification::centredLeft);
     }
 
@@ -509,6 +527,60 @@ private:
     int voices = 0, mode = 0;
 };
 
+/** v1.2 — global quality mode selector with an honest per-mode description. */
+class QualitySection : public SectionPanel,
+                       private juce::AudioProcessorValueTreeState::Listener
+{
+public:
+    explicit QualitySection (juce::AudioProcessorValueTreeState& apvts)
+        : SectionPanel ("QUALITY", theme::accent), state (apvts), mode ("", false)
+    {
+        mode.attach (apvts, ids::qualityMode);
+        addAndMakeVisible (mode);
+        raw = apvts.getRawParameterValue (ids::qualityMode);
+        apvts.addParameterListener (ids::qualityMode, this);
+    }
+
+    ~QualitySection() override { state.removeParameterListener (ids::qualityMode, this); }
+
+    void paint (juce::Graphics& g) override
+    {
+        SectionPanel::paint (g);
+        static const char* info[4] =
+        {
+            "Exact 1.1 processing everywhere. Old presets and projects sound identical. Zero added latency.",
+            "New engines at the lowest CPU cost: improved interpolation, no oversampling. Zero added latency.",
+            "Default for new sounds: 2x oversampled distortion, oversampled ladder/OTA filters, FDN reverb, smoothed EQ. Reports 2 samples of latency.",
+            "Maximum real-time quality: 4x distortion oversampling, everything from HIGH. Reports 4 samples of latency."
+        };
+        const int idx = juce::jlimit (0, 3, raw != nullptr ? (int) raw->load() : 0);
+        auto c = content().withTrimmedTop (30).reduced (6, 0);
+        g.setColour (theme::textDim);
+        g.setFont (LookAndFeelYD::uiFont (11.0f));
+        g.drawFittedText (info[idx], c, juce::Justification::topLeft, 4);
+    }
+
+    void resized() override
+    {
+        auto c = content();
+        mode.setBounds (c.removeFromTop (24).removeFromLeft (200));
+    }
+
+private:
+    void parameterChanged (const juce::String&, float) override
+    {
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<QualitySection> (this)]
+        {
+            if (safe != nullptr)
+                safe->repaint();
+        });
+    }
+
+    juce::AudioProcessorValueTreeState& state;
+    Selector mode;
+    std::atomic<float>* raw = nullptr;
+};
+
 class GlobalPage : public juce::Component
 {
 public:
@@ -518,11 +590,13 @@ public:
           output (p.getApvts(), "OUTPUT", theme::accent2, nullptr,
                   std::vector<std::pair<juce::String, const char*>> {
                       { "MASTER", ids::masterLevel }, { "STEREO WIDTH", ids::stereoWidth } }, nullptr),
+          quality (p.getApvts()),
           status (p)
     {
         addAndMakeVisible (play);
         addAndMakeVisible (arp);
         addAndMakeVisible (output);
+        addAndMakeVisible (quality);
         addAndMakeVisible (status);
     }
 
@@ -530,7 +604,8 @@ public:
     {
         play.setBounds (8, 4, 590, 336);
         arp.setBounds (604, 4, 588, 336);
-        output.setBounds (8, 344, 590, 340);
+        output.setBounds (8, 344, 590, 226);
+        quality.setBounds (8, 576, 590, 108);
         status.setBounds (604, 344, 588, 340);
     }
 
@@ -538,6 +613,7 @@ private:
     GlobalSection play;
     ArpSection arp;
     FxModule output;
+    QualitySection quality;
     StatusPanel status;
 };
 

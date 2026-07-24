@@ -35,7 +35,10 @@ public:
         return (float) (60.0 / std::max (20.0, bpm)) * choices::delayDivBeats[idx];
     }
 
-    void process (float* l, float* r, int n, float timeSec, float feedback, float toneHz, float mix)
+    /** hq (v1.2, quality ≠ LEGACY): Catmull-Rom fractional reads — cleaner
+        repeats, especially while the time slews. hq=false is the exact 1.1 path. */
+    void process (float* l, float* r, int n, float timeSec, float feedback, float toneHz, float mix,
+                  bool hq = false)
     {
         const float wet = clampf (mix, 0.0f, 1.0f);
         const float fb  = clampf (feedback, 0.0f, 0.95f);
@@ -51,8 +54,8 @@ public:
         {
             currentDelay += (target - currentDelay) * slew;
 
-            const float dl = readInterp (bufL, currentDelay);
-            const float dr = readInterp (bufR, currentDelay);
+            const float dl = hq ? readInterp4 (bufL, currentDelay) : readInterp (bufL, currentDelay);
+            const float dr = hq ? readInterp4 (bufR, currentDelay) : readInterp (bufR, currentDelay);
 
             lpL += c * (dl - lpL);
             lpR += c * (dr - lpR);
@@ -76,6 +79,21 @@ private:
         const float a = buf[(size_t) (i0 & mask)];
         const float b = buf[(size_t) ((i0 + 1) & mask)];
         return a + frac * (b - a);
+    }
+
+    float readInterp4 (const std::vector<float>& buf, float delaySamples) const
+    {
+        const float pos = (float) writePos - delaySamples;
+        const int i0 = (int) std::floor (pos);
+        const float t = pos - (float) i0;
+        const float y0 = buf[(size_t) ((i0 - 1) & mask)];
+        const float y1 = buf[(size_t) (i0 & mask)];
+        const float y2 = buf[(size_t) ((i0 + 1) & mask)];
+        const float y3 = buf[(size_t) ((i0 + 2) & mask)];
+        const float a = 0.5f * (3.0f * (y1 - y2) + y3 - y0);
+        const float b = y0 - 2.5f * y1 + 2.0f * y2 - 0.5f * y3;
+        const float cc = 0.5f * (y2 - y0);
+        return ((a * t + b) * t + cc) * t + y1;
     }
 
     double sr = 44100.0;

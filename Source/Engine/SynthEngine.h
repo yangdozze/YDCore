@@ -25,6 +25,12 @@ public:
     int  getActiveVoiceCount() const noexcept { return activeVoiceCount.load (std::memory_order_relaxed); }
     bool isPedalDown() const noexcept { return pedalDown; }
 
+    // v1.2 rendering context — set by the processor right before process()
+    // (audio thread only; the pointers reference immutable banks)
+    const WavetableBank* wtBankOsc[2] { nullptr, nullptr };
+    const WavetableBank* hqShapesBank = nullptr;
+    QualityMode qualityForBlock = QualityMode::Legacy;
+
 private:
     void handleMidiEvent (const juce::MidiMessage& m, const ParamRefs& params);
     void noteOn  (int note, float vel, const ParamRefs& params);

@@ -15,7 +15,7 @@ OUT = os.path.join(os.path.dirname(__file__), "..", "Presets")
 
 # choice index helpers (mirror Parameters.cpp)
 SINE, TRI, SAW, SQUARE, PULSE, SUPERSAW, NOISEW = range(7)
-LP12, LP24, HP12, HP24, BP12, NOTCH = range(6)
+LP12, LP24, HP12, HP24, BP12, NOTCH, LADDER24, OTA24, SEM12, BP24 = range(10)   # v1.2 appended models
 L_SINE, L_TRI, L_SAW, L_SQR, L_SH = range(5)
 POLY, MONO, LEGATO = range(3)
 ARP_UP, ARP_DOWN, ARP_UPDOWN, ARP_RANDOM = range(4)
@@ -25,9 +25,16 @@ LD_OFF, LD_PITCH, LD_O1PITCH, LD_O2PITCH, LD_CUT, LD_AMP, LD_PAN, LD_PW, LD_FX =
 MD_OFF, MD_PITCH, MD_O1PITCH, MD_O2PITCH, MD_O1PW, MD_O2PW, MD_CUT, MD_L1RATE, MD_L2RATE, MD_NOISE = range(10)
 # matrix sources
 MS_OFF, MS_VEL, MS_WHEEL, MS_AT, MS_KEY, MS_AENV, MS_FENV, MS_MENV, MS_LFO1, MS_LFO2, MS_RND, MS_PB = range(12)
-# matrix destinations
+# matrix destinations (v1.2 appended entries after Stereo Width)
 MDST_OFF, MDST_O1P, MDST_O2P, MDST_ALLP, MDST_O1F, MDST_O2F, MDST_O1L, MDST_O2L, MDST_O1PAN, MDST_O2PAN, \
-    MDST_O1PW, MDST_O2PW, MDST_CUT, MDST_RES, MDST_AMP, MDST_L1R, MDST_L2R, MDST_FX, MDST_WIDTH = range(19)
+    MDST_O1PW, MDST_O2PW, MDST_CUT, MDST_RES, MDST_AMP, MDST_L1R, MDST_L2R, MDST_FX, MDST_WIDTH, \
+    MDST_O1WT, MDST_O2WT, MDST_O1WARP, MDST_O2WARP, MDST_O1DET, MDST_O2DET, MDST_O1SPR, MDST_O2SPR, \
+    MDST_DRIVE = range(28)
+# v1.2 engines / warp / quality
+E_LEGACY, E_HQ, E_WT = range(3)
+W_OFF, W_BENDP, W_BENDM, W_SYNC, W_ASYM, W_MIRROR = range(6)
+Q_LEGACY, Q_ECO, Q_HIGH, Q_ULTRA = range(4)
+LD_WTPOS = 9   # appended lfo quick destination "WT Pos 1+2"
 # arp divisions: 1/4,1/4T,1/8,1/8T,1/16,1/16T,1/32
 A4, A4T, A8, A8T, A16, A16T, A32 = range(7)
 # lfo divisions: 1/1,1/2,1/2T,1/4,1/4T,1/8,1/8T,1/16,1/16T,1/32
@@ -39,14 +46,25 @@ def env(pfx, a, d, s, r):
     return {f"{pfx}Attack": a, f"{pfx}Decay": d, f"{pfx}Sustain": s, f"{pfx}Release": r}
 
 def osc(n, wave=None, on=None, oct=None, semi=None, fine=None, level=None, pan=None,
-        pw=None, uni=None, det=None, spread=None, drift=None, phase=None, randphase=None):
+        pw=None, uni=None, det=None, spread=None, drift=None, phase=None, randphase=None,
+        engine=None, wtpos=None, warpmode=None, warpamt=None):
     o, out = f"osc{n}", {}
     for k, v in [("Wave", wave), ("On", on), ("Oct", oct), ("Semi", semi), ("Fine", fine),
                  ("Level", level), ("Pan", pan), ("PW", pw), ("UniCount", uni), ("UniDetune", det),
-                 ("UniSpread", spread), ("Drift", drift), ("Phase", phase), ("RandPhase", randphase)]:
+                 ("UniSpread", spread), ("Drift", drift), ("Phase", phase), ("RandPhase", randphase),
+                 ("Engine", engine), ("WtPos", wtpos), ("WarpMode", warpmode), ("WarpAmt", warpamt)]:
         if v is not None:
             out[o + k] = v
     return out
+
+def curves(pfx, a=None, d=None, r=None):
+    out = {}
+    if a is not None: out[f"{pfx}AttackCurve"] = a
+    if d is not None: out[f"{pfx}DecayCurve"] = d
+    if r is not None: out[f"{pfx}ReleaseCurve"] = r
+    return out
+
+W = {}  # name -> {"osc1": bank, "osc2": bank} — v1.2 wavetable references
 
 def lfo(n, wave=None, rate=None, sync=None, div=None, fade=None, dest=None, amount=None,
         retrig=None, bipolar=None, phase=None):
@@ -416,6 +434,230 @@ P["Glitch Bloom"] = ("Experimental", {
     **fx(dist={"Drive": 0.4, "Tone": 5000, "Mix": 0.5}, dly={"Sync": 1, "Div": D16, "Feedback": 0.45, "Mix": 0.3}),
 })
 
+# ======================================================================
+# v1.2 factory presets — the new BASIC HQ / WAVETABLE engines on show.
+# Every entry sets qualityMode HIGH (the intended default for new sounds);
+# LEGACY presets above remain byte-identical. Poly unless noted.
+# ======================================================================
+
+# ---------------- Bass ----------------
+P["Neon Vector Bass"] = ("Bass", {
+    **osc(1, engine=E_WT, wtpos=0.35, warpmode=W_ASYM, warpamt=0.4, level=0.8, uni=3, det=14, spread=0.5),
+    **osc(2, SINE, engine=E_HQ, on=1, oct=-1, level=0.55),
+    "qualityMode": Q_HIGH, "subOn": 1, "subLevel": 0.25,
+    **filt(LADDER24, 380, 0.35, 0.3, 0.1, 0.5), **env("amp", 0.002, 0.4, 0.6, 0.12),
+    **env("filt", 0.002, 0.28, 0.08, 0.15), **curves("amp", d=0.4),
+    **mat(1, MS_WHEEL, MDST_O1WT, 0.5, 0),
+    "playMode": MONO, "glideTime": 0.04,
+    **fx(eq={"eqLow": 2.0}),
+})
+P["Sub Divide"] = ("Bass", {
+    **osc(1, PULSE, engine=E_HQ, pw=0.22, level=0.75, drift=0.1),
+    **osc(2, SINE, engine=E_HQ, on=1, oct=-1, level=0.7),
+    "qualityMode": Q_HIGH,
+    **filt(OTA24, 520, 0.3, 0.45, 0.0, 0.4), **env("amp", 0.002, 0.5, 0.7, 0.1),
+    **env("filt", 0.001, 0.3, 0.12, 0.12),
+    **mat(1, MS_VEL, MDST_CUT, 0.3, 0),
+    **fx(dist={"Drive": 0.3, "Tone": 2800, "Mix": 0.5}, eq={"eqLow": 1.5}),
+})
+
+# ---------------- Lead ----------------
+P["Chrome Cutter"] = ("Lead", {
+    **osc(1, engine=E_WT, wtpos=0.25, warpmode=W_SYNC, warpamt=0.3, level=0.75, uni=3, det=10, spread=0.6),
+    **osc(2, engine=E_WT, on=1, wtpos=0.6, semi=12, level=0.35),
+    "qualityMode": Q_HIGH,
+    **filt(LP24, 4200, 0.2, 0.15, 0.3, 0.3), **env("amp", 0.004, 0.3, 0.8, 0.2),
+    **env("filt", 0.003, 0.4, 0.4, 0.25),
+    **mat(1, MS_WHEEL, MDST_O1WARP, 0.6, 0), **mat(2, MS_AT, MDST_O1WT, 0.4, 0),
+    **fx(dly={"Sync": 1, "Div": D8T, "Feedback": 0.3, "Mix": 0.22}, rv={"Mix": 0.18, "Size": 0.45}),
+})
+W["Chrome Cutter"] = {"osc1": "FM Chrome", "osc2": "Soft Glass"}
+P["Glass Caller"] = ("Lead", {
+    **osc(1, engine=E_WT, wtpos=0.4, level=0.8, uni=1, drift=0.2),
+    "qualityMode": Q_HIGH,
+    **filt(SEM12, 3200, 0.35, 0.2, 0.4, 0.35), **env("amp", 0.01, 0.35, 0.75, 0.3),
+    **env("filt", 0.01, 0.5, 0.5, 0.3), **curves("amp", a=-0.3),
+    **lfo(1, L_SINE, 5.2, dest=LD_WTPOS, amount=0.18, fade=0.9),
+    "playMode": LEGATO, "glideTime": 0.06,
+    **fx(rv={"Mix": 0.25, "Size": 0.55}),
+})
+W["Glass Caller"] = {"osc1": "Vocal Glass"}
+
+# ---------------- Pad ----------------
+P["Tidal Bloom"] = ("Pad", {
+    **osc(1, engine=E_WT, wtpos=0.2, level=0.7, uni=5, det=16, spread=0.85, drift=0.3),
+    **osc(2, engine=E_WT, on=1, wtpos=0.7, fine=-8, level=0.5),
+    "qualityMode": Q_HIGH,
+    **filt(LP12, 2600, 0.15, 0.0, 0.2, 0.2), **env("amp", 0.9, 1.2, 0.85, 1.6),
+    **env("filt", 1.2, 1.5, 0.6, 1.4), **curves("amp", a=-0.5, r=-0.4),
+    **lfo(1, L_SINE, 0.07, dest=LD_WTPOS, amount=0.35, fade=2.0),
+    **fx(ch={"Mix": 0.35, "Rate": 0.4, "Depth": 0.4}, rv={"Mix": 0.4, "Size": 0.8}),
+})
+W["Tidal Bloom"] = {"osc1": "Slow Tide", "osc2": "Breath Pad"}
+P["Velvet Choir"] = ("Pad", {
+    **osc(1, engine=E_WT, wtpos=0.3, level=0.65, uni=5, det=12, spread=0.9),
+    **osc(2, TRI, engine=E_HQ, on=1, oct=-1, level=0.4),
+    "qualityMode": Q_HIGH,
+    **filt(LP24, 1900, 0.2, 0.1, 0.25, 0.25), **env("amp", 0.7, 1.0, 0.8, 1.3),
+    **env("filt", 0.9, 1.2, 0.55, 1.2), **curves("amp", a=-0.6),
+    **mat(1, MS_WHEEL, MDST_O1WT, 0.6, 0), **mat(2, MS_LFO2, MDST_O1PAN, 0.25, 1),
+    **lfo(2, L_SINE, 0.11, retrig=0),
+    **fx(rv={"Mix": 0.35, "Size": 0.7, "Damp": 0.6}),
+})
+W["Velvet Choir"] = {"osc1": "Vowel Morph"}
+
+# ---------------- Pluck ----------------
+P["Bright Prime"] = ("Pluck", {
+    **osc(1, SQUARE, engine=E_HQ, level=0.75, uni=3, det=8, spread=0.5),
+    **osc(2, SAW, engine=E_HQ, on=1, semi=12, level=0.3),
+    "qualityMode": Q_HIGH,
+    **filt(SEM12, 1500, 0.3, 0.15, 0.5, 0.55), **env("amp", 0.001, 0.28, 0.0, 0.25),
+    **env("filt", 0.001, 0.2, 0.0, 0.2), **curves("amp", d=0.5), **curves("filt", d=0.5),
+    **mat(1, MS_VEL, MDST_CUT, 0.4, 0),
+    **fx(dly={"Sync": 1, "Div": D8, "Feedback": 0.25, "Mix": 0.2}),
+})
+P["Orbit Pluck"] = ("Pluck", {
+    **osc(1, engine=E_WT, wtpos=0.0, level=0.8, uni=1),
+    "qualityMode": Q_HIGH,
+    **filt(LP24, 3800, 0.25, 0.1, 0.4, 0.4), **env("amp", 0.001, 0.22, 0.0, 0.3),
+    **env("filt", 0.001, 0.18, 0.0, 0.25), **curves("amp", d=0.6),
+    **mat(1, MS_AENV, MDST_O1WT, 0.55, 0), **mat(2, MS_VEL, MDST_AMP, 0.25, 0),
+    **fx(dly={"Sync": 1, "Div": D4T, "Feedback": 0.35, "Mix": 0.25}, rv={"Mix": 0.15, "Size": 0.4}),
+})
+W["Orbit Pluck"] = {"osc1": "Orbit"}
+
+# ---------------- Keys ----------------
+P["Glass Keys"] = ("Keys", {
+    **osc(1, engine=E_WT, wtpos=0.55, level=0.7, uni=1, drift=0.15),
+    **osc(2, SINE, engine=E_HQ, on=1, oct=1, level=0.2, pan=0.3),
+    "qualityMode": Q_HIGH,
+    **filt(LP12, 5200, 0.1, 0.0, 0.5, 0.2), **env("amp", 0.002, 0.6, 0.35, 0.5),
+    **env("filt", 0.002, 0.7, 0.3, 0.5), **curves("amp", d=0.3, r=-0.3),
+    **mat(1, MS_VEL, MDST_O1WT, 0.3, 0),
+    **fx(ch={"Mix": 0.25, "Rate": 0.7, "Depth": 0.25}, rv={"Mix": 0.2, "Size": 0.5}),
+})
+W["Glass Keys"] = {"osc1": "Soft Glass"}
+P["EP Drift"] = ("Keys", {
+    **osc(1, TRI, engine=E_HQ, level=0.75, drift=0.35),
+    **osc(2, SINE, engine=E_HQ, on=1, oct=1, semi=0, fine=4, level=0.25),
+    "qualityMode": Q_HIGH,
+    **filt(OTA24, 2400, 0.2, 0.3, 0.4, 0.3), **env("amp", 0.003, 0.8, 0.5, 0.4),
+    **env("filt", 0.002, 0.6, 0.4, 0.4),
+    **mat(1, MS_VEL, MDST_CUT, 0.35, 0), **mat(2, MS_AT, MDST_L1R, 0.2, 0),
+    **lfo(1, L_SINE, 4.5, dest=LD_AMP, amount=0.08, fade=1.2),
+    **fx(ch={"Mix": 0.3, "Rate": 0.9, "Depth": 0.3}, eq={"eqMid": -1.0, "eqHigh": 1.0}),
+})
+
+# ---------------- Sequence ----------------
+P["Vector Steps"] = ("Sequence", {
+    **osc(1, engine=E_WT, wtpos=0.15, level=0.75, uni=1),
+    **osc(2, PULSE, engine=E_HQ, on=1, pw=0.3, oct=-1, level=0.45),
+    "qualityMode": Q_HIGH,
+    **filt(LP24, 1400, 0.4, 0.25, 0.2, 0.5), **env("amp", 0.001, 0.16, 0.0, 0.12),
+    **env("filt", 0.001, 0.12, 0.0, 0.1),
+    **arp(ARP_UPDOWN, A16, 0.55, 2),
+    **lfo(1, L_TRI, sync=1, div=LV1, dest=LD_WTPOS, amount=0.5, retrig=0),
+    **fx(dly={"Sync": 1, "Div": D8T, "Feedback": 0.3, "Mix": 0.2}),
+})
+W["Vector Steps"] = {"osc1": "Digital Steps"}
+P["Async Runner"] = ("Sequence", {
+    **osc(1, SAW, engine=E_HQ, level=0.8, uni=3, det=12, spread=0.4),
+    "qualityMode": Q_HIGH, "subOn": 1, "subLevel": 0.3,
+    **filt(LADDER24, 900, 0.5, 0.35, 0.15, 0.55), **env("amp", 0.001, 0.2, 0.1, 0.15),
+    **env("filt", 0.001, 0.15, 0.0, 0.12), **curves("filt", d=0.6),
+    **arp(ARP_RANDOM, A16, 0.5, 1),
+    **mat(1, MS_LFO2, MDST_CUT, 0.25, 1),
+    **lfo(2, L_SH, sync=1, div=LV8, retrig=0),
+    **fx(dist={"Drive": 0.25, "Tone": 4200, "Mix": 0.4}, dly={"Sync": 1, "Div": D16, "Feedback": 0.3, "Mix": 0.18}),
+})
+
+# ---------------- Atmosphere ----------------
+P["Breath Field"] = ("Atmosphere", {
+    **osc(1, engine=E_WT, wtpos=0.1, level=0.6, uni=5, det=20, spread=1.0, drift=0.4),
+    "qualityMode": Q_HIGH, "noiseType": 1, "noiseLevel": 0.06, "noiseTone": -0.5,
+    **filt(LP12, 1600, 0.1, 0.0, 0.1, 0.3), **env("amp", 1.8, 2.0, 0.8, 2.5),
+    **env("filt", 2.5, 2.0, 0.5, 2.0), **curves("amp", a=-0.7, r=-0.5),
+    **lfo(1, L_SINE, 0.05, dest=LD_WTPOS, amount=0.6, fade=3.0),
+    **fx(rv={"Mix": 0.5, "Size": 0.9, "Damp": 0.4}),
+})
+W["Breath Field"] = {"osc1": "Breath Pad"}
+P["Slow Alloy"] = ("Atmosphere", {
+    **osc(1, engine=E_WT, wtpos=0.0, warpmode=W_MIRROR, warpamt=0.3, level=0.6, uni=1),
+    **osc(2, engine=E_WT, on=1, wtpos=0.5, oct=-1, level=0.4),
+    "qualityMode": Q_HIGH,
+    **filt(BP24, 1100, 0.35, 0.0, 0.0, 0.3), **env("amp", 1.2, 1.8, 0.7, 2.2),
+    **env("filt", 1.5, 2.0, 0.5, 2.0),
+    **mat(1, MS_LFO1, MDST_O1WT, 0.5, 1), **mat(2, MS_LFO2, MDST_O2WT, 0.4, 1),
+    **lfo(1, L_SINE, 0.06, retrig=0), **lfo(2, L_TRI, 0.043, retrig=0),
+    **fx(rv={"Mix": 0.45, "Size": 0.85}, dly={"Sync": 1, "Div": D2, "Feedback": 0.4, "Mix": 0.2}),
+})
+W["Slow Alloy"] = {"osc1": "Bell Alloy", "osc2": "Ring Shift"}
+
+# ---------------- FX ----------------
+P["Riser Fold"] = ("FX", {
+    **osc(1, engine=E_WT, wtpos=0.0, warpmode=W_BENDP, warpamt=0.5, level=0.7, uni=5, det=30, spread=0.9),
+    "qualityMode": Q_HIGH,
+    **filt(HP12, 300, 0.3, 0.0, 0.0, 0.6), **env("amp", 2.5, 1.0, 1.0, 1.5),
+    **env("filt", 3.5, 1.0, 1.0, 1.0), **env("mod", 3.5, 1.0, 1.0, 1.0),
+    "modEnvAmt": 0.8, "modEnvDest": MD_PITCH,
+    **mat(1, MS_MENV, MDST_O1WT, 0.9, 0),
+    **fx(rv={"Mix": 0.4, "Size": 0.8}, dly={"Sync": 1, "Div": D8, "Feedback": 0.45, "Mix": 0.3}),
+})
+W["Riser Fold"] = {"osc1": "Fractal Fold"}
+P["Glitch Signal"] = ("FX", {
+    **osc(1, engine=E_WT, wtpos=0.5, level=0.75, uni=1),
+    "qualityMode": Q_HIGH,
+    **filt(BP12, 1800, 0.5, 0.2, 0.0, 0.4), **env("amp", 0.001, 0.3, 0.4, 0.2),
+    **env("filt", 0.001, 0.2, 0.3, 0.2),
+    **mat(1, MS_LFO2, MDST_O1WT, 0.8, 1), **mat(2, MS_LFO2, MDST_CUT, 0.3, 1),
+    **lfo(2, L_SH, sync=1, div=LV16, retrig=0),
+    **fx(dist={"Drive": 0.35, "Tone": 6000, "Mix": 0.45}, dly={"Sync": 1, "Div": D16, "Feedback": 0.5, "Mix": 0.35}),
+})
+W["Glitch Signal"] = {"osc1": "Glitch Line"}
+
+# ---------------- Digital ----------------
+P["Bit Sweep"] = ("Digital", {
+    **osc(1, engine=E_WT, wtpos=0.0, level=0.8, uni=1),
+    **osc(2, engine=E_WT, on=1, wtpos=0.3, semi=-12, level=0.4),
+    "qualityMode": Q_HIGH,
+    **filt(LP24, 6000, 0.15, 0.1, 0.3, 0.2), **env("amp", 0.002, 0.4, 0.6, 0.25),
+    **env("filt", 0.002, 0.4, 0.5, 0.25),
+    **lfo(1, L_TRI, 0.5, dest=LD_WTPOS, amount=0.5, fade=0.5),
+    **mat(1, MS_WHEEL, MDST_O1WARP, 0.4, 0),
+    **fx(ch={"Mix": 0.2, "Rate": 0.8, "Depth": 0.2}),
+})
+W["Bit Sweep"] = {"osc1": "Bitframe", "osc2": "Pulse Matrix"}
+P["Comb Circuit"] = ("Digital", {
+    **osc(1, engine=E_WT, wtpos=0.4, warpmode=W_SYNC, warpamt=0.25, level=0.75, uni=3, det=6, spread=0.6),
+    "qualityMode": Q_HIGH,
+    **filt(SEM12, 2600, 0.4, 0.1, 0.35, 0.4), **env("amp", 0.003, 0.5, 0.6, 0.3),
+    **env("filt", 0.002, 0.5, 0.4, 0.3),
+    **mat(1, MS_AT, MDST_O1WARP, 0.5, 0), **mat(2, MS_VEL, MDST_O1WT, 0.3, 0),
+    **fx(dly={"Sync": 1, "Div": D8D, "Feedback": 0.35, "Mix": 0.25}, rv={"Mix": 0.15, "Size": 0.5}),
+})
+W["Comb Circuit"] = {"osc1": "Spectral Comb"}
+
+# ---------------- Analog ----------------
+P["Analog Estate"] = ("Analog", {
+    **osc(1, SUPERSAW, engine=E_HQ, det=22, level=0.7, uni=1, drift=0.25),
+    **osc(2, SAW, engine=E_HQ, on=1, oct=-1, fine=-6, level=0.45),
+    "qualityMode": Q_HIGH, "subOn": 1, "subLevel": 0.2,
+    **filt(LADDER24, 1500, 0.4, 0.4, 0.2, 0.45), **env("amp", 0.005, 0.6, 0.7, 0.35),
+    **env("filt", 0.004, 0.5, 0.4, 0.35), **curves("amp", a=-0.2),
+    **mat(1, MS_WHEEL, MDST_CUT, 0.45, 0), **mat(2, MS_VEL, MDST_DRIVE, 0.35, 0),
+    **fx(ch={"Mix": 0.25, "Rate": 0.5, "Depth": 0.3}, eq={"eqLow": 1.0, "eqHigh": 0.5}),
+})
+P["Warm Stack"] = ("Analog", {
+    **osc(1, engine=E_WT, wtpos=0.3, level=0.7, uni=3, det=10, spread=0.7, drift=0.3),
+    **osc(2, TRI, engine=E_HQ, on=1, oct=-1, level=0.35),
+    "qualityMode": Q_HIGH,
+    **filt(OTA24, 1900, 0.3, 0.35, 0.25, 0.3), **env("amp", 0.01, 0.7, 0.75, 0.5),
+    **env("filt", 0.01, 0.6, 0.5, 0.5), **curves("amp", r=-0.3),
+    **lfo(1, L_SINE, 0.09, dest=LD_WTPOS, amount=0.25, fade=1.5, retrig=0),
+    **fx(ch={"Mix": 0.3, "Rate": 0.45, "Depth": 0.35}, rv={"Mix": 0.18, "Size": 0.5}),
+})
+W["Warm Stack"] = {"osc1": "Vintage Stack"}
+
 # ============================== descriptions ==============================
 DESC = {
     "Dark Pressure":  "Heavy mono bass with a squashed LP24 bite and sub support.",
@@ -469,9 +711,48 @@ DESC = {
     "Random Walk":    "Melodic S&H pitch wander with dub echoes.",
     "Metal Garden":   "Inharmonic metallic clangs with resonant ring.",
     "Glitch Bloom":   "Hyperactive 1/32 random arp with bitcrush-like grit.",
+
+    # ---- v1.2 wavetable/HQ presets ----
+    "Neon Vector Bass": "Wavetable saw-stack bass with asymmetry warp; wheel scans the table.",
+    "Sub Divide":       "HQ pulse bass over a pure sub sine through the OTA filter.",
+    "Chrome Cutter":    "FM Chrome sync lead - wheel pushes the sync, aftertouch scans.",
+    "Glass Caller":     "Vocal Glass legato lead with a slow position vibrato.",
+    "Tidal Bloom":      "Slow Tide pad breathing across the table under an LFO tide.",
+    "Velvet Choir":     "Vowel Morph pad - the wheel glides A-E-I-O-U across the choir.",
+    "Bright Prime":     "Snappy HQ square pluck through the SEM-style filter.",
+    "Orbit Pluck":      "Orbit wavetable pluck; the amp envelope rides the position.",
+    "Glass Keys":       "Soft Glass keys with velocity-scanned sparkle.",
+    "EP Drift":         "Drifting HQ triangle EP with OTA warmth and slow tremolo.",
+    "Vector Steps":     "Digital Steps arp; a synced triangle LFO walks the table each bar.",
+    "Async Runner":     "Random HQ saw sequence through a snappy ladder filter.",
+    "Breath Field":     "Breath Pad atmosphere swelling across three octaves of air.",
+    "Slow Alloy":       "Bell Alloy and Ring Shift drifting on free LFOs with mirror warp.",
+    "Riser Fold":       "Fractal Fold riser - the mod envelope drags pitch and position up.",
+    "Glitch Signal":    "Glitch Line stutter - S&H jumps the table and the band-pass.",
+    "Bit Sweep":        "Bitframe crush sweep over a Pulse Matrix sub layer.",
+    "Comb Circuit":     "Spectral Comb with light sync warp - aftertouch tightens the comb.",
+    "Analog Estate":    "HQ supersaw estate pad-lead through the ladder, velocity drives.",
+    "Warm Stack":       "Vintage Stack beating slowly through the OTA filter.",
 }
 
 # ============================== write ==============================
+
+# factory wavetable bank names (must mirror Source/Engine/WavetableFactory.cpp)
+VALID_BANKS = {
+    "Prime Shapes", "Analog Warmth", "Vintage Stack",
+    "Bitframe", "Pulse Matrix", "Digital Steps",
+    "Harmonic Rise", "Odd Order", "Spectral Comb",
+    "Vowel Morph", "Formant Sweep", "Vocal Glass",
+    "Bell Alloy", "FM Chrome", "Ring Shift",
+    "Orbit", "Slow Tide", "Wave Traveller",
+    "Soft Glass", "Breath Pad", "Velvet",
+    "Saw Stack", "Growl Formant", "Torn Edge",
+    "Random Walk", "Fractal Fold", "Glitch Line",
+}
+
+# original 51 preset names (frozen: favorites/state are name-keyed)
+LEGACY_COUNT = 51
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     for f in os.listdir(OUT):
@@ -481,11 +762,17 @@ def main():
     bundle = []
     missing_desc = [n for n in P if n not in DESC]
     assert not missing_desc, f"presets missing descriptions: {missing_desc}"
+    for name, refs in W.items():
+        assert name in P, f"wavetable refs for unknown preset: {name}"
+        for bank in refs.values():
+            assert bank in VALID_BANKS, f"unknown wavetable bank '{bank}' in preset '{name}'"
     for name, (cat, params) in P.items():
         cats.setdefault(cat, []).append(name)
         doc = {"name": name, "category": cat, "author": AUTHOR,
                "description": DESC[name], "format": "YDCore-1",
                "params": {k: (round(v, 6) if isinstance(v, float) else v) for k, v in sorted(params.items())}}
+        if name in W:
+            doc["wavetables"] = W[name]      # appended key; older loaders ignore it
         bundle.append(doc)
         safe = re.sub(r"[^A-Za-z0-9]+", "_", name)
         with open(os.path.join(OUT, f"{safe}.json"), "w") as fh:
@@ -496,10 +783,13 @@ def main():
         json.dump(bundle, fh, indent=1)
     total = len(P)
     print(f"Wrote {total} presets (+ factory_bundle.json):")
-    for c in ["Bass", "Sub Bass", "Lead", "Pluck", "Keys", "Pad", "Atmosphere", "Arpeggio", "FX", "Experimental"]:
+    for c in ["Bass", "Sub Bass", "Lead", "Pluck", "Keys", "Pad", "Atmosphere", "Arpeggio",
+              "FX", "Experimental", "Sequence", "Digital", "Analog"]:
         print(f"  {c}: {len(cats.get(c, []))}")
-    assert total >= 40, "need at least 40 presets"
-    assert all(len(v) >= 4 for v in cats.values()), "each category needs 4+"
+    assert total >= LEGACY_COUNT + 18, f"need the 51 legacy presets plus 18+ v1.2 presets, got {total}"
+    legacy_cats = {c: v for c, v in cats.items() if c not in ("Sequence", "Digital", "Analog")}
+    assert all(len(v) >= 4 for v in legacy_cats.values()), "each legacy category needs 4+"
+    assert all(len(v) >= 2 for v in cats.values()), "each category needs 2+"
     return 0
 
 if __name__ == "__main__":

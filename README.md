@@ -13,27 +13,49 @@ Original DSP, original tabbed UI, original presets.
   MIDI activity LED, CPU and voice meters and a real stereo output meter
 - **32-voice polyphonic engine** with Poly / Mono / Legato modes, portamento,
   note priority, sustain pedal, click-free voice stealing
-- **2 oscillators** with live waveform displays: sine, triangle, saw, square,
-  pulse (PW), supersaw (7-stack), noise; octave/semi/fine, level, pan,
+- **Three oscillator engines per oscillator** *(new in 1.2)*:
+  **LEGACY** (the exact 1.1 sound for old presets and projects),
+  **BASIC HQ** (band-limited classic waves via harmonic table selection —
+  measurably lower aliasing, including a fully band-limited triangle) and
+  **WAVETABLE** (original mip-mapped wavetable engine)
+- **Original wavetable engine** *(new in 1.2)*: 27 factory banks in 9 musical
+  categories (Analog, Digital, Harmonic, Formant, Metallic, Motion, Soft,
+  Aggressive, Experimental), 2048-sample frames, position morphing, warp modes
+  (Bend ±, windowed Sync, Asymmetry, Mirror), frequency-aware anti-aliasing with
+  crossfaded mip levels, a compact browser with categories/search/import, and
+  **user WAV import** (single-cycle and multi-frame; see `docs/WAVETABLES.md`)
+- **2 oscillators** with live waveform/wavetable displays: sine, triangle, saw,
+  square, pulse (PW), supersaw (7-stack), noise; octave/semi/fine, level, pan,
   phase/random phase, 1–7 voice unison with detune & stereo spread, analog drift
 - **Sub oscillator** (sine/square, −1 octave) and **noise generator** (white/pink + tone)
-- **Multimode filter**: LP12/LP24/HP12/HP24/BP/Notch (TPT SVF), cutoff, resonance,
+- **Multimode filter**: LP12/LP24/HP12/HP24/BP/Notch (TPT SVF) plus *(new in
+  1.2, appended)* **Ladder 24**, **OTA 24**, **SEM 12** (style-inspired
+  originals with quality-aware oversampling) and **BP 24** — cutoff, resonance,
   drive, key tracking, envelope amount — stable at high resonance
-- **3 envelopes**: amp, filter, mod (with destination routing) — live envelope graphs
+- **3 envelopes**: amp, filter, mod (with destination routing) — live envelope
+  graphs, plus *(new in 1.2)* appended attack/decay/release **curve controls**
+  whose Classic setting reproduces the calibrated 1.1 shapes exactly
 - **2 LFOs**: 5 shapes incl. S&H, Hz or tempo-sync (1/1 … 1/32 incl. triplets),
   fade-in, phase, bipolar/unipolar, retrigger or free-running, quick-assign destination
 - **8-slot modulation matrix** with per-slot activity indicators: velocity,
   mod wheel, aftertouch, key tracking, 3 envelopes, 2 LFOs, per-note random,
   pitch bend → pitch, fine, level, pan, PW, cutoff, resonance, amp, LFO rates,
-  FX mix, stereo width
+  FX mix, stereo width, plus *(new in 1.2, appended)* wavetable position, warp
+  amount, unison detune, stereo spread (per oscillator) and filter drive
+- **Global quality modes** *(new in 1.2)*: LEGACY / ECO / HIGH / ULTRA —
+  from exact 1.1 processing to 4× oversampled distortion, oversampled nonlinear
+  filters, an FDN reverb and smoothed EQ (see `docs/QUALITY_MODES.md`)
 - **Arpeggiator**: up/down/up-down/random, tempo-synced rates, gate, 1–3 octaves, hold
 - **Master FX**: distortion, chorus, tempo-synced delay, reverb, 3-band EQ —
-  individually bypassable with click-free crossfades
-- **Preset bank**: 51 factory presets in 10 categories with author &
-  description metadata, three-column browser (sources & categories / searchable
-  list / info panel), favorites that persist, keyboard navigation,
-  save/save-as (portable JSON), init & randomize, state saved with the project
-- **~145 host-automatable parameters** with stable IDs and sensible ranges
+  individually bypassable with click-free crossfades; HIGH/ULTRA quality adds
+  oversampling, Catmull-Rom interpolation and the FDN reverb
+- **Preset bank**: 71 factory presets (51 originals + 20 new wavetable/HQ
+  sounds) in 13 categories with author & description metadata, three-column
+  browser (sources & categories / searchable list / info panel), favorites that
+  persist, keyboard navigation, save/save-as (portable JSON), init & randomize,
+  state saved with the project
+- **~165 host-automatable parameters** with stable IDs and sensible ranges —
+  every 1.1 parameter ID and choice order is preserved (append-only contract)
 
 ## Requirements
 
@@ -80,14 +102,21 @@ cmake --build build --parallel
 
 ```bash
 ./build/YDCoreTests_artefacts/Release/YDCoreTests            # exit code 0 = pass
-./build/YDCoreTests_artefacts/Release/YDCoreTests --screenshots shots   # per-tab UI captures
+./build/YDCoreTests_artefacts/Release/YDCoreTests --screenshots shots [WxH] [preset]  # per-tab UI captures
+./build/YDCoreTests_artefacts/Release/YDCoreTests --baseline write|check <dir> [tol]  # engine regression renders
 ```
 
-430+ checks: audio at 44.1/48 kHz across buffer sizes 32–4096, note-on/off click
-bounds, NaN/denormal freedom, all factory presets load & sound (incl. brand
-metadata), state save/restore round-trip, rapid preset switching during
+1000+ checks: audio at 44.1/48 kHz across buffer sizes 32–4096, note-on/off
+click bounds, NaN/denormal freedom, all factory presets load & sound (incl.
+brand metadata), state save/restore round-trip, rapid preset switching during
 playback, poly/mono behaviour, 500+ random-note stress, automation sweeps,
-arpeggiator output, parameter ID uniqueness, user preset save/reload.
+arpeggiator output, parameter ID uniqueness, user preset save/reload — plus the
+v1.2 contracts: append-only parameter/choice guards, legacy-state migration,
+wavetable bank integrity, warp/position safety, measured aliasing improvements,
+filter stability, envelope-curve shapes, quality switching, oversampled FX
+paths, WAV import fuzzing, unison/mono gain staging and factory preset
+validation. The `--baseline` harness renders every factory preset at
+44.1/48/96 kHz for sample-exact comparisons between engine revisions.
 
 ## Installing (FL Studio, Windows)
 
@@ -128,6 +157,15 @@ folder is still read, and favorites migrate automatically).
 
 - **Top bar**: GLOBUS logo, page tabs, preset display (click for the bank),
   ◀ ▶ navigation, SAVE, INIT, RAND, MIDI LED, CPU/voices, output meter.
+- **Oscillator engines** *(1.2)*: the selector next to ON picks LEGACY /
+  BASIC HQ / WAVETABLE per oscillator. In WAVETABLE mode the PW knob becomes
+  **POS**, a **WARP** knob + mode appear, the display shows the real frames
+  with a position bar, and the name button opens the **wavetable browser**
+  (◀ ▶ steps banks; IMPORT WAV brings in your own tables —
+  see `docs/WAVETABLES.md`).
+- **Quality** *(1.2)*: GLOBAL page — LEGACY / ECO / HIGH / ULTRA
+  (see `docs/QUALITY_MODES.md`). New sounds default to HIGH via the factory
+  presets; old sounds stay LEGACY automatically.
 - **PRESETS page**: sources & categories on the left, searchable list in the
   middle (↑/↓ + Enter to load, double-click, star = favorite, Esc returns to
   OSC), info panel with author/description plus Load / Delete / Init / Random /
@@ -151,9 +189,14 @@ Verify all downloads against the published `SHA256SUMS.txt`.
   global sources (wheel, aftertouch, pitch bend) still modulate their rate.
 - FX-mix and stereo-width matrix destinations respond to global modulation
   sources (wheel/AT/bend/LFOs), not per-voice envelopes — the FX bus is shared.
-- Triangle oscillator is naive (not BLEP-corrected); inaudible aliasing except
-  at extreme pitches.
-- The distortion stage is not oversampled (CPU economy).
+- The **LEGACY** oscillator engine keeps the 1.1 naive triangle and the LEGACY
+  quality mode keeps the non-oversampled distortion **by design** — that is the
+  compatibility contract. Select BASIC HQ / WAVETABLE engines and ECO/HIGH/ULTRA
+  quality for the improved paths.
+- Wavetable **Sync** warp is a windowed sync (documented approximation): the
+  wrap discontinuity is faded over the last 3 % of the master period.
+- ULTRA quality oversamples the per-voice nonlinear filters at 2× (not 4×) —
+  a documented CPU trade; the master distortion does run at 4×.
 - MIDI CC hard-wiring: CC1 (mod wheel), CC64 (sustain), CC120/123 (all sound/
   notes off), pitch bend, channel & poly aftertouch. Other CCs are available
   through host automation rather than a MIDI-learn system.
@@ -162,19 +205,28 @@ Verify all downloads against the published `SHA256SUMS.txt`.
 
 ```
 Source/
-  Parameters.*           parameter contract (IDs, layout, tooltips)
-  PluginProcessor.*      MIDI → arp → engine → FX; state save/restore; metering
+  Parameters.*           parameter contract (IDs, layout, tooltips; append-only)
+  PluginProcessor.*      MIDI → arp → engine → FX; state save/restore; metering;
+                         wavetable selection/import; quality latency reporting
   PluginEditor.*         top bar + five tabbed pages, scale-to-fit
-  Engine/                DspUtils, Oscillator, Filter, Envelope, LFO,
-                         ModMatrix, Voice, SynthEngine, Arpeggiator
-  Effects/               Distortion, ChorusFx, DelayFx, ReverbFx, EqFx, EffectsChain
-  Presets/               PresetManager (JSON factory + user presets, favorites)
-  UI/                    LookAndFeel, controls, waveform/envelope displays,
-                         top bar, pages, preset bank
-Presets/                 51 factory presets (JSON + single-file bundle)
-Tests/                   headless verification suite + screenshot tool
+  Engine/                DspUtils, Oscillator (legacy), OscillatorHQ (BASIC HQ +
+                         WAVETABLE voices), Wavetable (mip data + library),
+                         WavetableFactory (deterministic banks), WavetableImport,
+                         Filter (legacy), FilterHQ (Ladder/OTA/SEM + halfbands),
+                         Envelope (with curves), LFO, ModMatrix, Voice,
+                         SynthEngine, Arpeggiator
+  Effects/               Distortion (2×/4× OS), ChorusFx, DelayFx, ReverbFx,
+                         ReverbHQ (FDN), EqFx, EffectsChain (quality routing)
+  Presets/               PresetManager (JSON factory + user presets, favorites,
+                         randomizer with engine integration)
+  UI/                    LookAndFeel, controls, waveform/wavetable displays,
+                         wavetable browser, top bar, pages, preset bank
+Presets/                 71 factory presets (JSON + single-file bundle)
+Tests/                   headless verification suite (1032 checks) + screenshot
+                         tool + --baseline regression harness
+docs/                    SIGNING.md, WAVETABLES.md, QUALITY_MODES.md
 tools/gen_presets.py     factory preset generator
-.github/workflows/       Windows x64 + Linux CI
+.github/workflows/       Windows x64 CI
 ```
 
 ## License

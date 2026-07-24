@@ -1,5 +1,5 @@
 ; ==============================================================================
-;  GLOBUS 1.1.0 - Windows x64 installer (Inno Setup 6)
+;  GLOBUS 1.2.0 - Windows x64 installer (Inno Setup 6)
 ;  (c) 2026 Ninth Parallel Audio. AGPL-3.0.
 ;
 ;  - Installs the real compiled VST3 bundle to  C:\Program Files\Common Files\VST3\
@@ -12,7 +12,7 @@
 
 #define MyAppName "GLOBUS"
 #define MyAppPublisher "Ninth Parallel Audio"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.2.0"
 #define MyAppURL "https://github.com/yangdozze/YDCore"
 #define MyAppExeName "GLOBUS.exe"
 

@@ -5,12 +5,14 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 
+class YDCoreAudioProcessor;
+
 namespace ydc
 {
 class PresetManager
 {
 public:
-    PresetManager (juce::AudioProcessor& processor, juce::AudioProcessorValueTreeState& apvts);
+    PresetManager (YDCoreAudioProcessor& processor, juce::AudioProcessorValueTreeState& apvts);
 
     struct PresetInfo
     {
@@ -81,7 +83,7 @@ private:
     void saveFavorites() const;
     static juce::File favoritesFile();
 
-    juce::AudioProcessor& proc;
+    YDCoreAudioProcessor& proc;
     juce::AudioProcessorValueTreeState& apvts;
     std::vector<PresetInfo> presets;
     juce::StringArray favorites;
@@ -89,8 +91,10 @@ private:
     std::array<std::atomic<bool>, NumLocks> locks { false, false, false, false, false };
     std::vector<std::pair<juce::String, float>> undoSnapshot;   // paramID -> normalized
     juce::String undoName, undoCategory;
+    juce::String undoWt[2];                                      // v1.2: wavetable refs in undo
     bool hasUndo = false;
     std::vector<float> cleanSnapshot;                            // normalized, in getParameters() order
+    juce::String cleanWt[2];                                     // v1.2: wavetable refs in clean snapshot
 
     JUCE_DECLARE_NON_COPYABLE (PresetManager)
 };

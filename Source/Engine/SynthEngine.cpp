@@ -109,6 +109,10 @@ void SynthEngine::process (juce::AudioBuffer<float>& out, const juce::MidiBuffer
         ctx.lfoBasePhase[i] = masterPhaseTotal[i];
         ctx.lfoRateHz[i]    = masterRateBase[i] * gmv.lfoRateMul[i];
     }
+    ctx.wtBank[0] = wtBankOsc[0];
+    ctx.wtBank[1] = wtBankOsc[1];
+    ctx.hqShapes  = hqShapesBank;
+    ctx.quality   = qualityForBlock;
 
     // ---- event loop: render segments between sample-accurate MIDI events
     int prev = 0;

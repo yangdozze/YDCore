@@ -215,6 +215,36 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     p.push_back (std::make_unique<APF> (pid (ids::eqMid),  "EQ Mid", juce::NormalisableRange<float> (-12.0f, 12.0f, 0.1f), 0.0f, dbAttr()));
     p.push_back (std::make_unique<APF> (pid (ids::eqHigh), "EQ High", juce::NormalisableRange<float> (-12.0f, 12.0f, 0.1f), 0.0f, dbAttr()));
 
+    // ==================== v1.2 additions (APPEND ONLY below this line) ====================
+    // Every default selects the LEGACY 1.1 behaviour, so old states/presets that
+    // lack these parameters keep their exact sound.
+    for (int i = 1; i <= 2; ++i)
+    {
+        const juce::String n = "Osc " + juce::String (i) + " ";
+        p.push_back (std::make_unique<APC> (pid (ids::osc (i, "Engine")),   n + "Engine", choices::oscEngines, 0));      // Legacy
+        p.push_back (std::make_unique<APF> (pid (ids::osc (i, "WtPos")),    n + "WT Position", juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f, pctAttr()));
+        p.push_back (std::make_unique<APC> (pid (ids::osc (i, "WarpMode")), n + "Warp Mode", choices::warpModes, 0));    // Off
+        p.push_back (std::make_unique<APF> (pid (ids::osc (i, "WarpAmt")),  n + "Warp Amount", juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f, pctAttr()));
+    }
+
+    p.push_back (std::make_unique<APC> (pid (ids::qualityMode), "Quality Mode", choices::qualityModes, 0));              // Legacy
+
+    auto curveAttr = [] { return Attr().withStringFromValueFunction ([] (float v, int)
+    {
+        const int pc = juce::roundToInt (v * 100.0f);
+        if (pc == 0) return juce::String ("Classic");
+        return (pc > 0 ? "+" : "") + juce::String (pc) + " %";
+    }); };
+    auto addCurves = [&] (const char* aId, const char* dId, const char* rId, const juce::String& name)
+    {
+        p.push_back (std::make_unique<APF> (pid (aId), name + " Attack Curve",  juce::NormalisableRange<float> (-1.0f, 1.0f), 0.0f, curveAttr()));
+        p.push_back (std::make_unique<APF> (pid (dId), name + " Decay Curve",   juce::NormalisableRange<float> (-1.0f, 1.0f), 0.0f, curveAttr()));
+        p.push_back (std::make_unique<APF> (pid (rId), name + " Release Curve", juce::NormalisableRange<float> (-1.0f, 1.0f), 0.0f, curveAttr()));
+    };
+    addCurves (ids::ampCurveA, ids::ampCurveD, ids::ampCurveR, "Amp");
+    addCurves (ids::filCurveA, ids::filCurveD, ids::filCurveR, "Filter");
+    addCurves (ids::modCurveA, ids::modCurveD, ids::modCurveR, "Mod");
+
     return { p.begin(), p.end() };
 }
 
@@ -235,7 +265,9 @@ ParamRefs::ParamRefs (juce::AudioProcessorValueTreeState& s)
                             rp (ids::osc (n, "Semi")),      rp (ids::osc (n, "Fine")),      rp (ids::osc (n, "Level")),
                             rp (ids::osc (n, "Pan")),       rp (ids::osc (n, "PW")),        rp (ids::osc (n, "Phase")),
                             rp (ids::osc (n, "RandPhase")), rp (ids::osc (n, "UniCount")),  rp (ids::osc (n, "UniDetune")),
-                            rp (ids::osc (n, "UniSpread")), rp (ids::osc (n, "Drift")) };
+                            rp (ids::osc (n, "UniSpread")), rp (ids::osc (n, "Drift")),
+                            rp (ids::osc (n, "Engine")),    rp (ids::osc (n, "WtPos")),
+                            rp (ids::osc (n, "WarpMode")),  rp (ids::osc (n, "WarpAmt")) };
     }
 
     subOn = rp (ids::subOn); subWave = rp (ids::subWave); subLevel = rp (ids::subLevel); subPan = rp (ids::subPan);
@@ -245,9 +277,12 @@ ParamRefs::ParamRefs (juce::AudioProcessorValueTreeState& s)
     resonance = rp (ids::resonance); filterDrive = rp (ids::filterDrive); keyTrack = rp (ids::keyTrack);
     filterEnvAmt = rp (ids::filterEnvAmt);
 
-    amp = { rp (ids::ampA), rp (ids::ampD), rp (ids::ampS), rp (ids::ampR) };
-    fil = { rp (ids::filA), rp (ids::filD), rp (ids::filS), rp (ids::filR) };
-    mod = { rp (ids::modA), rp (ids::modD), rp (ids::modS), rp (ids::modR) };
+    amp = { rp (ids::ampA), rp (ids::ampD), rp (ids::ampS), rp (ids::ampR),
+            rp (ids::ampCurveA), rp (ids::ampCurveD), rp (ids::ampCurveR) };
+    fil = { rp (ids::filA), rp (ids::filD), rp (ids::filS), rp (ids::filR),
+            rp (ids::filCurveA), rp (ids::filCurveD), rp (ids::filCurveR) };
+    mod = { rp (ids::modA), rp (ids::modD), rp (ids::modS), rp (ids::modR),
+            rp (ids::modCurveA), rp (ids::modCurveD), rp (ids::modCurveR) };
     modEnvAmt = rp (ids::modEnvAmt); modEnvDest = rp (ids::modEnvDest);
 
     for (int i = 0; i < 2; ++i)
@@ -279,6 +314,8 @@ ParamRefs::ParamRefs (juce::AudioProcessorValueTreeState& s)
     dlyFb = rp (ids::dlyFb); dlyTone = rp (ids::dlyTone); dlyMix = rp (ids::dlyMix);
     rvOn = rp (ids::rvOn); rvSize = rp (ids::rvSize); rvDamp = rp (ids::rvDamp); rvWidth = rp (ids::rvWidth); rvMix = rp (ids::rvMix);
     eqOn = rp (ids::eqOn); eqLow = rp (ids::eqLow); eqMid = rp (ids::eqMid); eqHigh = rp (ids::eqHigh);
+
+    qualityMode = rp (ids::qualityMode);
 }
 
 //==============================================================================
@@ -400,6 +437,26 @@ juce::String getTooltip (const juce::String& id)
         m[ids::eqLow]     = "Low shelf gain (120 Hz).";
         m[ids::eqMid]     = "Mid peak gain (1 kHz).";
         m[ids::eqHigh]    = "High shelf gain (8 kHz).";
+
+        // ---- v1.2 additions ----
+        for (int i = 1; i <= 2; ++i)
+        {
+            const juce::String o = "Oscillator " + juce::String (i);
+            m[ids::osc (i, "Engine")]   = o + ": engine. LEGACY = original 1.1 sound, BASIC HQ = band-limited classic waves, WAVETABLE = frame-morphing wavetables.";
+            m[ids::osc (i, "WtPos")]    = o + ": position across the wavetable frames (WAVETABLE engine).";
+            m[ids::osc (i, "WarpMode")] = o + ": wavetable warp: bend, sync, asymmetry or mirror shaping of the frame read-out.";
+            m[ids::osc (i, "WarpAmt")]  = o + ": warp intensity.";
+        }
+        m[ids::qualityMode] = "Global quality: LEGACY = exact 1.1 processing, ECO = new engines at lowest CPU, HIGH = oversampled nonlinear stages, ULTRA = maximum real-time quality.";
+        auto curveTip = [&m] (const char* a, const char* d, const char* r, const juce::String& n)
+        {
+            m[a] = n + " attack shape: Classic = the calibrated analog curve, - = softer start, + = snappier.";
+            m[d] = n + " decay shape: Classic = the calibrated exponential, - = more linear, + = steeper.";
+            m[r] = n + " release shape: Classic = the calibrated exponential, - = more linear, + = steeper.";
+        };
+        curveTip (ids::ampCurveA, ids::ampCurveD, ids::ampCurveR, "Amp");
+        curveTip (ids::filCurveA, ids::filCurveD, ids::filCurveR, "Filter");
+        curveTip (ids::modCurveA, ids::modCurveD, ids::modCurveR, "Mod");
         return m;
     }();
 

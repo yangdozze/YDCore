@@ -9,6 +9,7 @@ void EffectsChain::prepare (double sampleRate, int maxBlockSize)
     chorus.prepare (sampleRate, maxBlockSize);
     delay.prepare (sampleRate, maxBlockSize);
     reverb.prepare (sampleRate);
+    reverbHq.prepare (sampleRate);    // both reverb engines always prepared up front
     eq.prepare (sampleRate);
 
     dryScratch.setSize (2, std::max (16, maxBlockSize));
@@ -23,12 +24,15 @@ void EffectsChain::reset()
     chorus.reset();
     delay.reset();
     reverb.reset();
+    reverbHq.reset();
     eq.reset();
     bpDist.prepare();
     bpChorus.prepare();
     bpDelay.prepare();
     bpReverb.prepare();
     bpEq.prepare();
+    usingHqReverb = false;
+    reverbEngineFade = 1.0f;
 }
 
 template <typename ProcessFn, typename ResetFn>
@@ -77,7 +81,8 @@ void EffectsChain::runEffect (BypassMixer& bp, bool enabled, juce::AudioBuffer<f
 }
 
 void EffectsChain::process (juce::AudioBuffer<float>& buffer, const ParamRefs& params,
-                            double bpm, float fxMixScale, float widthMod)
+                            double bpm, float fxMixScale, float widthMod,
+                            QualityMode quality)
 {
     const int n = buffer.getNumSamples();
     if (n == 0 || buffer.getNumChannels() < 2)
@@ -86,17 +91,24 @@ void EffectsChain::process (juce::AudioBuffer<float>& buffer, const ParamRefs& p
     const float fadePerSample = 1.0f / (0.010f * (float) sr);   // ~10 ms bypass fade
     auto wetScale = [fxMixScale] (float mix) { return clampf (mix * fxMixScale, 0.0f, 1.0f); };
 
+    // v1.2 quality routing — LEGACY keeps every 1.1 code path bit-exact
+    const bool hqPaths = quality != QualityMode::Legacy;
+    const int  distOs  = quality == QualityMode::High ? 2
+                       : quality == QualityMode::Ultra ? 4 : 1;
+    const bool wantHqReverb = quality == QualityMode::High || quality == QualityMode::Ultra;
+
     // ---- Distortion
     runEffect (bpDist, params.distOn->load() > 0.5f, buffer, n, fadePerSample,
         [&] (float* l, float* r, int len)
-        { dist.process (l, r, len, params.distDrive->load(), params.distTone->load(), params.distMix->load()); },
+        { dist.process (l, r, len, params.distDrive->load(), params.distTone->load(),
+                        params.distMix->load(), distOs); },
         [&] { dist.reset(); });
 
     // ---- Chorus
     runEffect (bpChorus, params.chOn->load() > 0.5f, buffer, n, fadePerSample,
         [&] (float* l, float* r, int len)
         { chorus.process (l, r, len, params.chRate->load(), params.chDepth->load(),
-                          params.chWidth->load(), wetScale (params.chMix->load())); },
+                          params.chWidth->load(), wetScale (params.chMix->load()), hqPaths); },
         [&] { chorus.reset(); });
 
     // ---- Delay
@@ -107,21 +119,39 @@ void EffectsChain::process (juce::AudioBuffer<float>& buffer, const ParamRefs& p
                           ? DelayFx::syncedTimeSec ((int) params.dlyDiv->load(), bpm)
                           : params.dlyTime->load();
             delay.process (l, r, len, t, params.dlyFb->load(), params.dlyTone->load(),
-                           wetScale (params.dlyMix->load()));
+                           wetScale (params.dlyMix->load()), hqPaths);
         },
         [&] { delay.reset(); });
 
-    // ---- Reverb
+    // ---- Reverb (engine swaps fade the wet back in — click-free quality changes)
+    if (wantHqReverb != usingHqReverb)
+    {
+        usingHqReverb = wantHqReverb;
+        reverbEngineFade = 0.0f;
+        if (usingHqReverb) reverbHq.reset();
+        else               reverb.reset();
+    }
+    reverbEngineFade = clampf (reverbEngineFade + (float) n / (0.05f * (float) sr), 0.0f, 1.0f);
     runEffect (bpReverb, params.rvOn->load() > 0.5f, buffer, n, fadePerSample,
         [&] (float* l, float* r, int len)
-        { reverb.process (l, r, len, params.rvSize->load(), params.rvDamp->load(),
-                          params.rvWidth->load(), wetScale (params.rvMix->load())); },
-        [&] { reverb.reset(); });
+        {
+            const float wet = usingHqReverb ? wetScale (params.rvMix->load()) * reverbEngineFade
+                                            : wetScale (params.rvMix->load())
+                                              * (quality == QualityMode::Legacy ? 1.0f : reverbEngineFade);
+            if (usingHqReverb)
+                reverbHq.process (l, r, len, params.rvSize->load(), params.rvDamp->load(),
+                                  params.rvWidth->load(), wet);
+            else
+                reverb.process (l, r, len, params.rvSize->load(), params.rvDamp->load(),
+                                params.rvWidth->load(), wet);
+        },
+        [&] { reverb.reset(); reverbHq.reset(); });
 
     // ---- EQ
     runEffect (bpEq, params.eqOn->load() > 0.5f, buffer, n, fadePerSample,
         [&] (float* l, float* r, int len)
-        { eq.process (l, r, len, params.eqLow->load(), params.eqMid->load(), params.eqHigh->load()); },
+        { eq.process (l, r, len, params.eqLow->load(), params.eqMid->load(), params.eqHigh->load(),
+                      hqPaths); },
         [&] { eq.reset(); });
 
     // ---- stereo width (mid/side), master gain, safety clip

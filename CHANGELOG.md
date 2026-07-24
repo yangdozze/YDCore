@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.2.0 — 2026-07-24 — wavetable engine & sound-quality upgrade
+
+Every change is **append-only**: all 1.1 parameter IDs, choice orders, preset
+names, the state tag, plugin codes and the installer identity are unchanged.
+Old projects and the original 51 presets load bit-compatibly and select the
+LEGACY paths automatically (verified sample-exactly against recorded 1.1.0
+renders of all 51 presets at 44.1/48/96 kHz).
+
+- **Three oscillator engines** (per oscillator, appended parameter):
+  **LEGACY** (exact 1.1 sound), **BASIC HQ** (band-limited classic waves via
+  harmonic table selection — the naive triangle is fixed here, and saw/square/
+  pulse alias measurably less at high pitches), **WAVETABLE** (new engine).
+- **Original wavetable engine**: 27 deterministic factory banks in 9 categories,
+  2048-sample frames, 10 crossfaded band-limited mip levels, Catmull-Rom reads,
+  click-safe position morphing, warp modes (Bend ±, windowed Sync, Asymmetry,
+  Mirror) with slope-aware anti-aliasing. Compact browser (categories, search,
+  metadata, import) that never changes the sound on opening; ◀ ▶ bank stepping.
+- **User wavetable import**: mono/stereo WAV (documented average downmix),
+  integer 8/16/24/32-bit + float32, 2048-frame tables, 4096/1024/512/256
+  segmentation, single-cycle resampling; worker-thread import; versioned asset
+  copies in `Documents/GLOBUS/Wavetables`; missing files show a badge and fall
+  back audibly without losing the reference. Malformed files fail safely.
+- **Appended modulation destinations**: WT position, warp amount, unison detune
+  and stereo spread per oscillator, plus filter drive; appended LFO quick-assign
+  “WT Pos 1+2”.
+- **New filter models (appended)**: Ladder 24 (ZDF, drive, self-osc edge),
+  OTA 24 (soft-clipped cascade), SEM 12 (style-inspired smooth multimode),
+  BP 24 — nonlinear cores oversample 2× at HIGH/ULTRA quality.
+- **HQ unison** for the new engines: deterministic placement, outer-voice gain
+  taper with power compensation (1–7 voices stay within a fraction of a dB on
+  average), equal-power spread, golden-ratio phases, mono-fold safe.
+- **Envelope curve controls (appended)**: attack/decay/release shape per
+  envelope; “Classic” reproduces the calibrated 1.1 curves exactly
+  (decay τ=t/3, release τ=t/4, attack overshoot 1.28).
+- **Global quality modes** LEGACY/ECO/HIGH/ULTRA (see `docs/QUALITY_MODES.md`):
+  2×/4× oversampled distortion with DC blocking, Catmull-Rom chorus/delay
+  interpolation, an original 8-line FDN reverb with damping and subtle
+  modulation, smoothed EQ. Latency reported honestly (0/0/2/4 samples).
+- **20 new factory presets** on the new engines (Bass, Lead, Pad, Pluck, Keys,
+  Sequence, Atmosphere, FX, Digital, Analog) — 71 factory presets total; the
+  original 51 are byte-identical. Two new presets are intentionally non-Poly
+  (Neon Vector Bass = Mono, Glass Caller = Legato).
+- **Randomizer 2.1**: NORMAL/WILD pick the new engines, curated banks and warp
+  ranges; SUBTLE never flips engine or bank; locks/undo now cover the wavetable
+  selection; never touches quality mode; never creates dangling table refs.
+  Stress-tested 1001 runs per mode.
+- **Regression harness**: `YDCoreTests --baseline write|check <dir>` renders
+  all factory presets at 44.1/48/96 kHz for sample-exact engine comparisons.
+- Suite grown from 508 to **1032 checks** (engine contracts, migration, banks,
+  warp, aliasing measurements, filters, curves, quality switching, FX paths,
+  import fuzzing, unison/mono gain staging, preset validation).
+- Old host states missing the new parameters now explicitly reset them to
+  LEGACY defaults on load (fixes a latent JUCE `replaceState` edge where new
+  parameters could inherit values from a previously loaded project).
+
+Signing status unchanged: artifacts are unsigned development builds
+(SmartScreen shows “Unknown publisher”); the pipeline stays signing-ready.
+
 ## 1.1.0 quality update — 2026-07-24
 
 - **Polyphony fix:** a note-off now releases exactly ONE voice of its pitch

@@ -1,5 +1,6 @@
 #include "PresetManager.h"
 #include "../Parameters.h"
+#include "../PluginProcessor.h"
 #include "BinaryData.h"
 
 namespace ydc
@@ -7,7 +8,7 @@ namespace ydc
 static constexpr const char* kNameProp     = "presetName";
 static constexpr const char* kCategoryProp = "presetCategory";
 
-PresetManager::PresetManager (juce::AudioProcessor& p, juce::AudioProcessorValueTreeState& s)
+PresetManager::PresetManager (YDCoreAudioProcessor& p, juce::AudioProcessorValueTreeState& s)
     : proc (p), apvts (s)
 {
     rescan();
@@ -19,8 +20,10 @@ PresetManager::PresetManager (juce::AudioProcessor& p, juce::AudioProcessorValue
 
 const juce::StringArray& PresetManager::categoryOrder()
 {
+    // v1.2 appended Sequence/Digital/Analog (display order only — not a save contract)
     static const juce::StringArray order { "Bass", "Sub Bass", "Lead", "Pluck", "Keys",
-                                           "Pad", "Atmosphere", "Arpeggio", "FX", "Experimental" };
+                                           "Pad", "Atmosphere", "Arpeggio", "FX", "Experimental",
+                                           "Sequence", "Digital", "Analog" };
     return order;
 }
 
@@ -200,6 +203,18 @@ bool PresetManager::applyPresetJson (const juce::var& root)
     setAllParametersToDefaults();
     for (const auto& prop : paramsObj->getProperties())
         setParamReal (prop.name.toString(), (float) (double) prop.value);
+
+    // v1.2: optional appended "wavetables" object — presets without it (all
+    // legacy presets) resolve to the default bank. Format stays "YDCore-1":
+    // unknown keys are ignored by loaders that predate them.
+    const auto wt = obj->getProperty ("wavetables");
+    for (int i = 0; i < 2; ++i)
+    {
+        juce::String name;
+        if (auto* wtObj = wt.getDynamicObject())
+            name = wtObj->getProperty (i == 0 ? "osc1" : "osc2").toString();
+        proc.setOscWavetableByName (i, name);   // empty → default bank
+    }
     return true;
 }
 
@@ -245,6 +260,12 @@ juce::var PresetManager::buildPresetJson (const juce::String& name, const juce::
     root->setProperty ("author", "User");
     root->setProperty ("format", "YDCore-1");
     root->setProperty ("params", juce::var (paramsObj));
+
+    // v1.2: persist wavetable identity (appended key; ignored by older loaders)
+    auto* wtObj = new juce::DynamicObject();
+    wtObj->setProperty ("osc1", proc.getOscWavetableName (0));
+    wtObj->setProperty ("osc2", proc.getOscWavetableName (1));
+    root->setProperty ("wavetables", juce::var (wtObj));
     return juce::var (root);
 }
 
@@ -284,6 +305,8 @@ bool PresetManager::deleteUserPreset (int index)
 void PresetManager::initPatch()
 {
     setAllParametersToDefaults();
+    for (int i = 0; i < 2; ++i)
+        proc.setOscWavetableByName (i, {});    // default bank
     setCurrentInfo ("Init", "Init");
     hasUndo = false;
     captureCleanSnapshot();
@@ -323,6 +346,8 @@ void PresetManager::captureUndoSnapshot()
             undoSnapshot.push_back ({ rp->paramID, rp->getValue() });
     undoName = getCurrentName();
     undoCategory = getCurrentCategory();
+    undoWt[0] = proc.getOscWavetableName (0);
+    undoWt[1] = proc.getOscWavetableName (1);
     hasUndo = true;
 }
 
@@ -333,6 +358,8 @@ void PresetManager::undoRandomize()
     for (const auto& [id, norm] : undoSnapshot)
         if (auto* rp = apvts.getParameter (id))
             rp->setValueNotifyingHost (norm);
+    proc.setOscWavetableByName (0, undoWt[0]);
+    proc.setOscWavetableByName (1, undoWt[1]);
     setCurrentInfo (undoName, undoCategory);
     hasUndo = false;
     captureCleanSnapshot();
@@ -344,12 +371,16 @@ void PresetManager::captureCleanSnapshot()
     for (auto* p : proc.getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
             cleanSnapshot.push_back (rp->getValue());
+    cleanWt[0] = proc.getOscWavetableName (0);
+    cleanWt[1] = proc.getOscWavetableName (1);
 }
 
 bool PresetManager::isModified() const
 {
     if (cleanSnapshot.empty())
         return false;
+    if (cleanWt[0] != proc.getOscWavetableName (0) || cleanWt[1] != proc.getOscWavetableName (1))
+        return true;
     size_t i = 0;
     for (auto* p : proc.getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
@@ -379,12 +410,21 @@ void PresetManager::randomizePatch (Strength strength)
                 preserved[rp->paramID] = rp->getValue();
         }
 
+    // wavetable selection is state, not a parameter — the OSC lock covers it too
+    const bool oscLocked = locks[LockOsc].load();
+    const juce::String keepWt[2] { proc.getOscWavetableName (0), proc.getOscWavetableName (1) };
+
     applyRandomRecipe (strength, rnd, preserved);
 
     // restore preserved values exactly
     for (const auto& [id, norm] : preserved)
         if (auto* rp = apvts.getParameter (id))
             rp->setValueNotifyingHost (norm);
+    if (oscLocked)
+    {
+        proc.setOscWavetableByName (0, keepWt[0]);
+        proc.setOscWavetableByName (1, keepWt[1]);
+    }
 
     const char* tag = strength == Strength::Subtle ? "Subtle" : strength == Strength::Wild ? "Wild" : "Random";
     setCurrentInfo (juce::String (tag) + " " + juce::String (rnd.nextInt (900) + 100), "Experimental");
@@ -431,6 +471,55 @@ void PresetManager::applyRandomRecipe (Strength strength, juce::Random& rnd,
     // NORMAL / WILD: rebuild the sound from defaults, then dial in a recipe
     setAllParametersToDefaults();
 
+    // ---- v1.2 engines: NORMAL favours the new engines with curated ranges;
+    // WILD roams every table and warp mode. Banks come only from the loaded
+    // factory registry, so a randomized patch can never dangle.
+    {
+        const auto& lib = WavetableLibrary::get();
+        auto pickBank = [&] () -> juce::String
+        {
+            if (lib.numBanks() == 0)
+                return {};
+            if (wild)
+                return lib.banks()[(size_t) rnd.nextInt (lib.numBanks())]->name;
+            // NORMAL: musical categories only
+            static const juce::StringArray tame { "Analog", "Harmonic", "Soft", "Motion", "Formant", "Digital" };
+            for (int tries = 0; tries < 12; ++tries)
+            {
+                const auto& b = lib.banks()[(size_t) rnd.nextInt (lib.numBanks())];
+                if (tame.contains (b->category))
+                    return b->name;
+            }
+            return lib.defaultBank()->name;
+        };
+        for (int o = 1; o <= 2; ++o)
+        {
+            const float roll = rnd.nextFloat();
+            const int engine = roll < 0.45f ? 1 : (roll < 0.80f ? 2 : 0);   // HQ / WT / Legacy
+            setR (ids::osc (o, "Engine"), (float) engine);
+            if (engine == 2)
+            {
+                proc.setOscWavetableByName (o - 1, pickBank());
+                setR (ids::osc (o, "WtPos"), rnd.nextFloat());
+                if (wild)
+                {
+                    setR (ids::osc (o, "WarpMode"), (float) rnd.nextInt (6));
+                    setR (ids::osc (o, "WarpAmt"), rnd.nextFloat());
+                }
+                else if (rnd.nextFloat() < 0.5f)
+                {
+                    const int tameWarp[] = { 0, 1, 2, 4 };   // Off / Bend± / Asymmetry
+                    setR (ids::osc (o, "WarpMode"), (float) tameWarp[rnd.nextInt (4)]);
+                    setR (ids::osc (o, "WarpAmt"), rnd.nextFloat() * 0.5f);
+                }
+            }
+        }
+        if (wild)
+            for (const char* id : { ids::ampCurveA, ids::ampCurveD, ids::ampCurveR })
+                if (rnd.nextFloat() < 0.4f)
+                    setR (id, rnd.nextFloat() * 0.8f - 0.4f);
+    }
+
     // ---- oscillators: guarantee at least one audible source
     const int nWaves = wild ? 7 : 6;                       // WILD may pick the noise wave
     setR (ids::osc (1, "Wave"), (float) rnd.nextInt (nWaves));
@@ -462,8 +551,13 @@ void PresetManager::applyRandomRecipe (Strength strength, juce::Random& rnd,
         setR (ids::noiseTone, rnd.nextFloat() * 1.2f - 0.6f);
     }
 
-    // ---- filter: stable resonance/drive pairing
-    setR (ids::filterType, rnd.nextFloat() < 0.7f ? (float) rnd.nextInt (2) : (float) rnd.nextInt (6));
+    // ---- filter: stable resonance/drive pairing (v1.2 may pick appended models)
+    if (wild)
+        setR (ids::filterType, (float) rnd.nextInt (10));                    // any model
+    else if (rnd.nextFloat() < 0.25f)
+        setR (ids::filterType, (float) (6 + rnd.nextInt (3)));               // Ladder/OTA/SEM
+    else
+        setR (ids::filterType, rnd.nextFloat() < 0.7f ? (float) rnd.nextInt (2) : (float) rnd.nextInt (6));
     setR (ids::cutoff, 220.0f * std::pow (2.0f, rnd.nextFloat() * (wild ? 6.5f : 5.5f)));
     const float res = rnd.nextFloat() * (wild ? 0.85f : 0.6f);
     setR (ids::resonance, res);

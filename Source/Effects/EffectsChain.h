@@ -7,6 +7,7 @@
 #include "ChorusFx.h"
 #include "DelayFx.h"
 #include "ReverbFx.h"
+#include "ReverbHQ.h"
 #include "EqFx.h"
 #include "../Parameters.h"
 
@@ -18,9 +19,13 @@ public:
     void prepare (double sampleRate, int maxBlockSize);
     void reset();
 
-    /** In-place on the engine output. fxMixScale/widthMod come from the mod matrix. */
+    /** In-place on the engine output. fxMixScale/widthMod come from the mod
+        matrix. quality routes the v1.2 paths: LEGACY = exact 1.1 processing,
+        ECO = better interpolation, HIGH = 2× distortion + FDN reverb,
+        ULTRA = 4× distortion + FDN reverb. */
     void process (juce::AudioBuffer<float>& buffer, const ParamRefs& params,
-                  double bpm, float fxMixScale, float widthMod);
+                  double bpm, float fxMixScale, float widthMod,
+                  QualityMode quality = QualityMode::Legacy);
 
 private:
     /** Crossfaded wet/dry wrapper around one effect. */
@@ -39,9 +44,12 @@ private:
     ChorusFx   chorus;
     DelayFx    delay;
     ReverbFx   reverb;
+    ReverbHQ   reverbHq;          // v1.2 HIGH/ULTRA reverb engine
     EqFx       eq;
 
     BypassMixer bpDist, bpChorus, bpDelay, bpReverb, bpEq;
+    bool  usingHqReverb = false;  // engine swap tracking (wet fades back in)
+    float reverbEngineFade = 1.0f;
 
     juce::AudioBuffer<float> dryScratch;   // preallocated in prepare()
     juce::SmoothedValue<float> masterGain;

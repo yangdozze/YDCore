@@ -37,6 +37,13 @@ struct ModValues
     float widthAdd      = 0.0f;
     float noiseLevelAdd = 0.0f;     // used by the mod envelope's Noise Level destination
 
+    // v1.2 destinations (consumed by the BASIC HQ / WAVETABLE paths)
+    float wtPosAdd[2]   { 0, 0 };   // wavetable position offset (final pos clamped 0..1)
+    float warpAdd[2]    { 0, 0 };   // warp amount offset (final clamped 0..1)
+    float detuneAdd[2]  { 0, 0 };   // unison detune offset in cents
+    float spreadAdd[2]  { 0, 0 };   // unison stereo spread offset
+    float driveAdd      = 0.0f;     // filter drive offset
+
     void clear() noexcept { *this = ModValues(); }
 };
 
@@ -50,6 +57,9 @@ namespace modScale
     constexpr float lfoRateOct   = 3.0f;
     constexpr float lfoQuickPitch= 12.0f;
     constexpr float lfoQuickCut  = 4.0f;
+
+    // v1.2
+    constexpr float detuneCents  = 50.0f;   // unison detune modulation depth
 }
 
 /** One decoded matrix slot (indices read once per control tick from the atomics). */
@@ -139,6 +149,15 @@ inline void evaluateMatrix (const SlotState* slots, int numSlots, const ModSourc
             case ModDest::Lfo2Rate:    out.lfoRateMul[1] *= std::exp2 (a * modScale::lfoRateOct); break;
             case ModDest::FxMix:       out.fxMixAdd      += a; break;
             case ModDest::StereoWidth: out.widthAdd      += a; break;
+            case ModDest::Osc1WtPos:   out.wtPosAdd[0]   += a; break;
+            case ModDest::Osc2WtPos:   out.wtPosAdd[1]   += a; break;
+            case ModDest::Osc1Warp:    out.warpAdd[0]    += a; break;
+            case ModDest::Osc2Warp:    out.warpAdd[1]    += a; break;
+            case ModDest::Osc1Detune:  out.detuneAdd[0]  += a * modScale::detuneCents; break;
+            case ModDest::Osc2Detune:  out.detuneAdd[1]  += a * modScale::detuneCents; break;
+            case ModDest::Osc1Spread:  out.spreadAdd[0]  += a; break;
+            case ModDest::Osc2Spread:  out.spreadAdd[1]  += a; break;
+            case ModDest::FilterDrive: out.driveAdd      += a; break;
             case ModDest::Off:
             case ModDest::Count:
             default: break;
@@ -164,6 +183,8 @@ inline void applyLfoQuickAssign (LfoDest dest, float amount, float lfoValue, Mod
         case LfoDest::PWAll:     out.pwAdd[0] += a * modScale::pwRange;
                                  out.pwAdd[1] += a * modScale::pwRange; break;
         case LfoDest::FxMix:     out.fxMixAdd += a; break;
+        case LfoDest::WtPosAll:  out.wtPosAdd[0] += a;
+                                 out.wtPosAdd[1] += a; break;
         case LfoDest::Off:
         default: break;
     }

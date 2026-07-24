@@ -5,7 +5,7 @@
 #   host projects, saved state and CI paths remain compatible.)
 # ==============================================================================
 cmake_minimum_required(VERSION 3.22)
-project(YDCore VERSION 1.1.0 LANGUAGES C CXX)
+project(YDCore VERSION 1.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -74,6 +74,8 @@ set(YDCORE_SOURCES
     Source/Engine/Voice.cpp
     Source/Engine/SynthEngine.cpp
     Source/Engine/Arpeggiator.cpp
+    Source/Engine/WavetableFactory.cpp
+    Source/Engine/WavetableImport.cpp
     Source/Effects/EffectsChain.cpp
     Source/Presets/PresetManager.cpp
     Source/UI/LookAndFeelYD.cpp)
@@ -134,6 +136,7 @@ if(YDCORE_BUILD_TESTS)
         JUCE_REPORT_APP_USAGE=0
         JUCE_STRICT_REFCOUNTEDPOINTER=1
         JUCE_JACK=0
+        JUCE_MODAL_LOOPS_PERMITTED=1      # tests pump the message queue for async import
         YDCORE_HEADLESS_TESTS=1)
     target_link_libraries(YDCoreTests PRIVATE
         YDCorePresetData

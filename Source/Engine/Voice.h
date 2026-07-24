@@ -3,7 +3,9 @@
 #pragma once
 #include "DspUtils.h"
 #include "Oscillator.h"
+#include "OscillatorHQ.h"
 #include "Filter.h"
+#include "FilterHQ.h"
 #include "Envelope.h"
 #include "LFO.h"
 #include "ModMatrix.h"
@@ -33,6 +35,11 @@ struct RenderContext
     float  pitchBendRange = 2.0f;        // semitones
     double lfoBasePhase[2] { 0.0, 0.0 }; // unwrapped master phase at block start
     float  lfoRateHz[2]    { 0.0f, 0.0f };
+
+    // v1.2: immutable banks published by the processor for this block
+    const WavetableBank* wtBank[2] { nullptr, nullptr };
+    const WavetableBank* hqShapes  = nullptr;
+    QualityMode quality = QualityMode::Legacy;
 };
 
 class Voice
@@ -68,9 +75,14 @@ private:
     void renderChunk (float* L, float* R, int absStart, int n, const RenderContext& ctx);
 
     OscUnit  osc[2];
+    BasicHqOsc        oscHq[2];   // v1.2 engines: render only when selected;
+    WavetableVoiceOsc oscWt[2];   // their RNG never touches the legacy sequence
+    float wtPosState[2]  { 0.0f, 0.0f };   // chunk-ramp smoothing state
+    float warpState[2]   { 0.0f, 0.0f };
     SubOsc   sub;
     NoiseGen noise;
     MultimodeFilter filter;
+    FilterHQ filterHq;            // v1.2 appended models (Ladder/OTA/SEM)
     AdsrEnv  ampEnv, filEnv, modEnv;
     Lfo      lfo[2];                     // used when retrigger is on
     float    lfoFadeElapsed[2] { 0, 0 }; // fade tracking for free-running mode
