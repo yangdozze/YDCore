@@ -14,6 +14,7 @@ PresetManager::PresetManager (juce::AudioProcessor& p, juce::AudioProcessorValue
     loadFavorites();
     if (! apvts.state.hasProperty (kNameProp))
         setCurrentInfo ("Init", "Init");
+    captureCleanSnapshot();
 }
 
 const juce::StringArray& PresetManager::categoryOrder()
@@ -170,6 +171,8 @@ bool PresetManager::loadPresetAt (int index)
         return false;
 
     setCurrentInfo (info.name, info.category);
+    hasUndo = false;
+    captureCleanSnapshot();
     return true;
 }
 
@@ -262,6 +265,7 @@ bool PresetManager::saveUserPreset (const juce::String& name, const juce::String
 
     rescan();
     setCurrentInfo (name, category);
+    captureCleanSnapshot();
     return true;
 }
 
@@ -281,101 +285,255 @@ void PresetManager::initPatch()
 {
     setAllParametersToDefaults();
     setCurrentInfo ("Init", "Init");
+    hasUndo = false;
+    captureCleanSnapshot();
 }
 
 //==============================================================================
-void PresetManager::randomizePatch()
+// Randomizer: three strengths, section locks, one-step undo.
+//==============================================================================
+int PresetManager::sectionOfParam (const juce::String& id) const
 {
-    auto& rnd = juce::Random::getSystemRandom();
-    auto setR = [this] (const juce::String& id, float v) { setParamReal (id, v); };
+    // never randomized (identity, play configuration, output safety)
+    static const juce::StringArray never { ids::masterLevel, ids::playMode, ids::polyLimit,
+                                           ids::pitchBendRange, ids::velAmount, ids::notePriority,
+                                           ids::glideTime, ids::arpOn, ids::arpMode, ids::arpDiv,
+                                           ids::arpGate, ids::arpOct, ids::arpHold };
+    if (never.contains (id))
+        return -1;
+    if (id.startsWith ("osc") || id.startsWith ("sub") || id.startsWith ("noise"))
+        return LockOsc;
+    if (id.startsWith ("filter") || id == ids::cutoff || id == ids::resonance || id == ids::keyTrack)
+        return LockFilter;
+    if (id.startsWith ("amp") || id.startsWith ("filt") || id.startsWith ("mod"))
+        return LockEnv;      // three envelopes incl. mod env amount/destination
+    if (id.startsWith ("lfo") || id.startsWith ("mat"))
+        return LockLfoMatrix;
+    if (id.startsWith ("dist") || id.startsWith ("chorus") || id.startsWith ("delay")
+        || id.startsWith ("reverb") || id.startsWith ("eq") || id == ids::stereoWidth)
+        return LockFx;
+    return -1;
+}
 
+void PresetManager::captureUndoSnapshot()
+{
+    undoSnapshot.clear();
+    for (auto* p : proc.getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
+            undoSnapshot.push_back ({ rp->paramID, rp->getValue() });
+    undoName = getCurrentName();
+    undoCategory = getCurrentCategory();
+    hasUndo = true;
+}
+
+void PresetManager::undoRandomize()
+{
+    if (! hasUndo)
+        return;
+    for (const auto& [id, norm] : undoSnapshot)
+        if (auto* rp = apvts.getParameter (id))
+            rp->setValueNotifyingHost (norm);
+    setCurrentInfo (undoName, undoCategory);
+    hasUndo = false;
+    captureCleanSnapshot();
+}
+
+void PresetManager::captureCleanSnapshot()
+{
+    cleanSnapshot.clear();
+    for (auto* p : proc.getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
+            cleanSnapshot.push_back (rp->getValue());
+}
+
+bool PresetManager::isModified() const
+{
+    if (cleanSnapshot.empty())
+        return false;
+    size_t i = 0;
+    for (auto* p : proc.getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
+        {
+            if (i >= cleanSnapshot.size())
+                return true;
+            if (std::abs (rp->getValue() - cleanSnapshot[i]) > 1.0e-4f)
+                return true;
+            ++i;
+        }
+    return false;
+}
+
+void PresetManager::randomizePatch (Strength strength)
+{
+    captureUndoSnapshot();
+    juce::Random rnd ((juce::int64) juce::Time::getMillisecondCounter()
+                  ^ (juce::int64) juce::Random::getSystemRandom().nextInt());
+
+    // capture everything that must be preserved: protected params + locked sections
+    std::map<juce::String, float> preserved;
+    for (auto* p : proc.getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
+        {
+            const int sec = sectionOfParam (rp->paramID);
+            if (sec < 0 || locks[(size_t) sec].load())
+                preserved[rp->paramID] = rp->getValue();
+        }
+
+    applyRandomRecipe (strength, rnd, preserved);
+
+    // restore preserved values exactly
+    for (const auto& [id, norm] : preserved)
+        if (auto* rp = apvts.getParameter (id))
+            rp->setValueNotifyingHost (norm);
+
+    const char* tag = strength == Strength::Subtle ? "Subtle" : strength == Strength::Wild ? "Wild" : "Random";
+    setCurrentInfo (juce::String (tag) + " " + juce::String (rnd.nextInt (900) + 100), "Experimental");
+    // deliberately NOT capturing a clean snapshot: a randomized sound reads as
+    // modified until the user saves it (Save As) — factory presets stay safe.
+}
+
+void PresetManager::applyRandomRecipe (Strength strength, juce::Random& rnd,
+                                       const std::map<juce::String, float>& preserved)
+{
+    auto setR = [this] (const juce::String& id, float v) { setParamReal (id, v); };
+    auto skip = [&preserved] (const juce::String& id) { return preserved.count (id) > 0; };
+
+    if (strength == Strength::Subtle)
+    {
+        // perturb continuous parameters around the current sound (no wave/mode
+        // switches, no resets) — small musical variations
+        for (auto* p : proc.getParameters())
+        {
+            auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p);
+            if (rp == nullptr || skip (rp->paramID))
+                continue;
+            const auto& range = rp->getNormalisableRange();
+            const bool discrete = range.interval >= 1.0f || rp->paramID.endsWith ("On")
+                               || rp->paramID.contains ("Wave") || rp->paramID.contains ("Type")
+                               || rp->paramID.contains ("Dest") || rp->paramID.contains ("Src")
+                               || rp->paramID.contains ("Dst")  || rp->paramID.contains ("Div")
+                               || rp->paramID.contains ("Sync") || rp->paramID.contains ("Retrig")
+                               || rp->paramID.contains ("Bipolar") || rp->paramID.contains ("RandPhase")
+                               || rp->paramID.contains ("Mode");
+            if (discrete)
+                continue;
+            const float jitter = (rnd.nextFloat() * 2.0f - 1.0f) * 0.06f;   // +/- 6 % of range
+            rp->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, rp->getValue() + jitter));
+        }
+        // subtle safety: keep envelope attack/decay away from degenerate zero
+        if (! skip (ids::ampA) && apvts.getRawParameterValue (ids::ampA)->load() < 0.001f) setR (ids::ampA, 0.002f);
+        if (! skip (ids::ampD) && apvts.getRawParameterValue (ids::ampD)->load() < 0.05f)  setR (ids::ampD, 0.08f);
+        return;
+    }
+
+    const bool wild = strength == Strength::Wild;
+
+    // NORMAL / WILD: rebuild the sound from defaults, then dial in a recipe
     setAllParametersToDefaults();
 
-    // oscillators
-    const int waves[] = { 0, 1, 2, 3, 4, 5 }; // skip noise wave for musical results
-    setR (ids::osc (1, "Wave"), (float) waves[rnd.nextInt (6)]);
-    setR (ids::osc (2, "Wave"), (float) waves[rnd.nextInt (6)]);
-    setR (ids::osc (2, "On"),   rnd.nextFloat() < 0.7f ? 1.0f : 0.0f);
+    // ---- oscillators: guarantee at least one audible source
+    const int nWaves = wild ? 7 : 6;                       // WILD may pick the noise wave
+    setR (ids::osc (1, "Wave"), (float) rnd.nextInt (nWaves));
+    setR (ids::osc (1, "On"), 1.0f);
+    setR (ids::osc (1, "Level"), 0.6f + rnd.nextFloat() * 0.25f);
+    setR (ids::osc (2, "Wave"), (float) rnd.nextInt (nWaves));
+    setR (ids::osc (2, "On"),   rnd.nextFloat() < (wild ? 0.85f : 0.7f) ? 1.0f : 0.0f);
+    setR (ids::osc (2, "Level"), 0.4f + rnd.nextFloat() * 0.35f);
+    // musical intervals: favour unison, octaves and fifths
+    const int intervals[] = { 0, 0, 0, 12, -12, 7, wild ? 5 : 0, wild ? -5 : 12 };
+    setR (ids::osc (2, "Semi"), (float) intervals[rnd.nextInt (8)]);
     setR (ids::osc (2, "Oct"),  (float) (rnd.nextInt (3) - 1));
-    setR (ids::osc (2, "Semi"), rnd.nextFloat() < 0.25f ? 7.0f : 0.0f);
-    setR (ids::osc (1, "Fine"), rnd.nextFloat() * 12.0f - 6.0f);
-    setR (ids::osc (2, "Fine"), rnd.nextFloat() * 20.0f - 10.0f);
+    setR (ids::osc (1, "Fine"), rnd.nextFloat() * 10.0f - 5.0f);
+    setR (ids::osc (2, "Fine"), rnd.nextFloat() * (wild ? 30.0f : 16.0f) - (wild ? 15.0f : 8.0f));
     for (int i = 1; i <= 2; ++i)
     {
-        setR (ids::osc (i, "Level"),     0.55f + rnd.nextFloat() * 0.3f);
         const int uni[] = { 1, 1, 3, 5, 7 };
         setR (ids::osc (i, "UniCount"),  (float) uni[rnd.nextInt (5)]);
-        setR (ids::osc (i, "UniDetune"), 8.0f + rnd.nextFloat() * 30.0f);
-        setR (ids::osc (i, "UniSpread"), 0.5f + rnd.nextFloat() * 0.5f);
-        setR (ids::osc (i, "Drift"),     rnd.nextFloat() * 0.4f);
+        setR (ids::osc (i, "UniDetune"), 6.0f + rnd.nextFloat() * (wild ? 45.0f : 25.0f));
+        setR (ids::osc (i, "UniSpread"), 0.4f + rnd.nextFloat() * 0.6f);
+        setR (ids::osc (i, "Drift"),     rnd.nextFloat() * (wild ? 0.7f : 0.35f));
         setR (ids::osc (i, "PW"),        0.2f + rnd.nextFloat() * 0.6f);
     }
-    if (rnd.nextFloat() < 0.4f) { setR (ids::subOn, 1.0f); setR (ids::subLevel, 0.3f + rnd.nextFloat() * 0.4f); }
-    if (rnd.nextFloat() < 0.3f) { setR (ids::noiseLevel, rnd.nextFloat() * 0.25f); setR (ids::noiseType, (float) rnd.nextInt (2)); }
+    if (rnd.nextFloat() < 0.4f) { setR (ids::subOn, 1.0f); setR (ids::subLevel, 0.25f + rnd.nextFloat() * 0.4f); }
+    if (rnd.nextFloat() < (wild ? 0.5f : 0.25f))
+    {
+        setR (ids::noiseLevel, rnd.nextFloat() * (wild ? 0.5f : 0.2f));
+        setR (ids::noiseType, (float) rnd.nextInt (2));
+        setR (ids::noiseTone, rnd.nextFloat() * 1.2f - 0.6f);
+    }
 
-    // filter
-    setR (ids::filterType, rnd.nextFloat() < 0.75f ? (float) rnd.nextInt (2) : (float) rnd.nextInt (6));
-    setR (ids::cutoff,     200.0f * std::pow (2.0f, rnd.nextFloat() * 6.0f));   // 200 Hz .. 12.8 kHz
-    setR (ids::resonance,  rnd.nextFloat() * 0.55f);
-    setR (ids::filterDrive, rnd.nextFloat() * 0.5f);
-    setR (ids::keyTrack,   rnd.nextFloat() < 0.5f ? 0.0f : 0.5f);
-    setR (ids::filterEnvAmt, rnd.nextFloat() * 0.8f);
+    // ---- filter: stable resonance/drive pairing
+    setR (ids::filterType, rnd.nextFloat() < 0.7f ? (float) rnd.nextInt (2) : (float) rnd.nextInt (6));
+    setR (ids::cutoff, 220.0f * std::pow (2.0f, rnd.nextFloat() * (wild ? 6.5f : 5.5f)));
+    const float res = rnd.nextFloat() * (wild ? 0.85f : 0.6f);
+    setR (ids::resonance, res);
+    setR (ids::filterDrive, res > 0.7f ? rnd.nextFloat() * 0.3f : rnd.nextFloat() * (wild ? 0.8f : 0.5f));
+    setR (ids::keyTrack, rnd.nextFloat() < 0.5f ? 0.0f : 0.5f);
+    setR (ids::filterEnvAmt, rnd.nextFloat() * (wild ? 1.6f : 0.9f) - (wild ? 0.4f : 0.1f));
 
-    // envelope archetype: 0 pluck, 1 pad, 2 keys
+    // ---- envelope archetypes (pluck / pad / keys), degenerate times excluded
     const int arch = rnd.nextInt (3);
-    if (arch == 0)
+    auto env = [&] (float a, float d, float s, float r, float fa, float fd, float fs, float fr)
     {
-        setR (ids::ampA, 0.001f + rnd.nextFloat() * 0.004f);
-        setR (ids::ampD, 0.1f + rnd.nextFloat() * 0.5f);
-        setR (ids::ampS, 0.0f);
-        setR (ids::ampR, 0.1f + rnd.nextFloat() * 0.4f);
-        setR (ids::filA, 0.001f);
-        setR (ids::filD, 0.08f + rnd.nextFloat() * 0.4f);
-        setR (ids::filS, 0.0f);
-        setR (ids::filR, 0.2f);
-    }
-    else if (arch == 1)
-    {
-        setR (ids::ampA, 0.3f + rnd.nextFloat() * 1.7f);
-        setR (ids::ampD, 0.5f);
-        setR (ids::ampS, 0.7f + rnd.nextFloat() * 0.3f);
-        setR (ids::ampR, 0.5f + rnd.nextFloat() * 2.0f);
-        setR (ids::filA, 0.5f + rnd.nextFloat() * 2.0f);
-        setR (ids::filD, 1.0f);
-        setR (ids::filS, 0.5f);
-        setR (ids::filR, 1.0f);
-    }
-    else
-    {
-        setR (ids::ampA, 0.002f + rnd.nextFloat() * 0.01f);
-        setR (ids::ampD, 0.3f + rnd.nextFloat() * 0.7f);
-        setR (ids::ampS, 0.4f + rnd.nextFloat() * 0.3f);
-        setR (ids::ampR, 0.2f + rnd.nextFloat() * 0.6f);
-        setR (ids::filA, 0.005f);
-        setR (ids::filD, 0.4f + rnd.nextFloat() * 0.6f);
-        setR (ids::filS, 0.3f);
-        setR (ids::filR, 0.4f);
-    }
+        setR (ids::ampA, a); setR (ids::ampD, d); setR (ids::ampS, s); setR (ids::ampR, r);
+        setR (ids::filA, fa); setR (ids::filD, fd); setR (ids::filS, fs); setR (ids::filR, fr);
+    };
+    if (arch == 0)      env (0.001f + rnd.nextFloat() * 0.004f, 0.12f + rnd.nextFloat() * 0.5f, 0.0f,
+                             0.1f + rnd.nextFloat() * 0.4f, 0.001f, 0.08f + rnd.nextFloat() * 0.4f, 0.0f, 0.2f);
+    else if (arch == 1) env (0.25f + rnd.nextFloat() * (wild ? 2.5f : 1.4f), 0.6f, 0.75f + rnd.nextFloat() * 0.25f,
+                             0.4f + rnd.nextFloat() * 1.8f, 0.5f + rnd.nextFloat() * 2.0f, 1.0f, 0.5f, 1.0f);
+    else                env (0.002f + rnd.nextFloat() * 0.01f, 0.3f + rnd.nextFloat() * 0.7f,
+                             0.4f + rnd.nextFloat() * 0.35f, 0.2f + rnd.nextFloat() * 0.5f,
+                             0.005f, 0.4f + rnd.nextFloat() * 0.6f, 0.3f, 0.4f);
 
-    // LFO 1 occasionally doing something tasteful
-    if (rnd.nextFloat() < 0.5f)
+    // ---- LFO 1 quick-assign: tasteful movement
+    if (rnd.nextFloat() < (wild ? 0.75f : 0.5f))
     {
         setR (ids::lfo (1, "Wave"), (float) rnd.nextInt (5));
-        setR (ids::lfo (1, "Rate"), 0.1f + rnd.nextFloat() * 7.0f);
-        setR (ids::lfo (1, "Dest"), (float) (rnd.nextFloat() < 0.6f ? 4 : 1)); // cutoff or pitch
-        setR (ids::lfo (1, "Amount"), (rnd.nextFloat() * 0.3f) * (rnd.nextBool() ? 1.0f : -1.0f));
+        setR (ids::lfo (1, "Rate"), 0.1f + rnd.nextFloat() * (wild ? 12.0f : 6.0f));
+        const int dests[] = { 4, 4, 1, 7 };               // mostly cutoff, some pitch/PW
+        setR (ids::lfo (1, "Dest"), (float) dests[rnd.nextInt (4)]);
+        const float maxAmt = wild ? 0.5f : 0.18f;          // pitch via quick-assign stays vibrato-sized in NORMAL
+        setR (ids::lfo (1, "Amount"), (rnd.nextFloat() * maxAmt) * (rnd.nextBool() ? 1.0f : -1.0f));
         setR (ids::lfo (1, "Fade"), rnd.nextFloat() < 0.4f ? rnd.nextFloat() * 1.5f : 0.0f);
     }
 
-    // FX
-    if (rnd.nextFloat() < 0.5f) { setR (ids::chOn, 1.0f); setR (ids::chMix, 0.25f + rnd.nextFloat() * 0.4f); }
-    if (rnd.nextFloat() < 0.7f) { setR (ids::rvOn, 1.0f); setR (ids::rvMix, 0.12f + rnd.nextFloat() * 0.28f);
-                                  setR (ids::rvSize, 0.3f + rnd.nextFloat() * 0.6f); }
-    if (rnd.nextFloat() < 0.4f) { setR (ids::dlyOn, 1.0f); setR (ids::dlyMix, 0.12f + rnd.nextFloat() * 0.25f);
-                                  setR (ids::dlyFb, 0.2f + rnd.nextFloat() * 0.35f); }
-    if (rnd.nextFloat() < 0.2f) { setR (ids::distOn, 1.0f); setR (ids::distDrive, rnd.nextFloat() * 0.5f); }
+    // ---- matrix: useful, non-duplicate routes
+    static const int usefulSrc[] = { 1, 2, 5, 8, 9, 10 };  // vel, wheel, ampenv, lfo1, lfo2, random
+    static const int usefulDst[] = { 12, 12, 6, 14, 8, 10 }; // cutoff (favoured), osc1 level, amp, pan, pw
+    const int routes = wild ? rnd.nextInt (4) : rnd.nextInt (3);
+    juce::Array<int> usedDst;
+    for (int s = 0; s < routes; ++s)
+    {
+        const int dst = usefulDst[rnd.nextInt (6)];
+        if (usedDst.contains (dst))
+            continue;                                       // no duplicate routes
+        usedDst.add (dst);
+        setR (ids::slot (s + 1, "Src"), (float) usefulSrc[rnd.nextInt (6)]);
+        setR (ids::slot (s + 1, "Dst"), (float) dst);
+        setR (ids::slot (s + 1, "Amt"), (rnd.nextFloat() * (wild ? 0.5f : 0.3f)) * (rnd.nextBool() ? 1.0f : -1.0f));
+    }
 
-    setCurrentInfo ("Random " + juce::String (rnd.nextInt (900) + 100), "Experimental");
+    // ---- FX: bounded, usable
+    if (rnd.nextFloat() < 0.5f) { setR (ids::chOn, 1.0f); setR (ids::chMix, 0.2f + rnd.nextFloat() * 0.35f); }
+    if (rnd.nextFloat() < 0.65f)
+    {
+        setR (ids::rvOn, 1.0f);
+        setR (ids::rvMix, 0.1f + rnd.nextFloat() * (wild ? 0.5f : 0.3f));
+        setR (ids::rvSize, 0.3f + rnd.nextFloat() * 0.6f);
+    }
+    if (rnd.nextFloat() < 0.4f)
+    {
+        setR (ids::dlyOn, 1.0f);
+        setR (ids::dlyMix, 0.1f + rnd.nextFloat() * 0.25f);
+        setR (ids::dlyFb, 0.15f + rnd.nextFloat() * (wild ? 0.45f : 0.3f));
+    }
+    if (rnd.nextFloat() < (wild ? 0.45f : 0.2f))
+    {
+        setR (ids::distOn, 1.0f);
+        setR (ids::distDrive, rnd.nextFloat() * (wild ? 0.8f : 0.5f));
+        setR (ids::distMix, 0.3f + rnd.nextFloat() * 0.5f);
+    }
 }
 
 //==============================================================================
