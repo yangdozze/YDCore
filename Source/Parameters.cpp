@@ -110,9 +110,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     p.push_back (std::make_unique<APB> (pid (ids::subOn),      "Sub On", false));
     p.push_back (std::make_unique<APC> (pid (ids::subWave),    "Sub Wave", choices::subWaves, 0));
     p.push_back (std::make_unique<APF> (pid (ids::subLevel),   "Sub Level", juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f, pctAttr()));
+    p.push_back (std::make_unique<APF> (pid (ids::subPan),     "Sub Pan", juce::NormalisableRange<float> (-1.0f, 1.0f), 0.0f, panAttr()));
     p.push_back (std::make_unique<APC> (pid (ids::noiseType),  "Noise Type", choices::noiseTypes, 0));
     p.push_back (std::make_unique<APF> (pid (ids::noiseLevel), "Noise Level", juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f, pctAttr()));
     p.push_back (std::make_unique<APF> (pid (ids::noiseTone),  "Noise Tone", juce::NormalisableRange<float> (-1.0f, 1.0f), 0.0f, biPctAttr()));
+    p.push_back (std::make_unique<APF> (pid (ids::noisePan),   "Noise Pan", juce::NormalisableRange<float> (-1.0f, 1.0f), 0.0f, panAttr()));
 
     // ---------------- Filter ----------------
     p.push_back (std::make_unique<APB> (pid (ids::filterOn),     "Filter On", true));
@@ -236,8 +238,8 @@ ParamRefs::ParamRefs (juce::AudioProcessorValueTreeState& s)
                             rp (ids::osc (n, "UniSpread")), rp (ids::osc (n, "Drift")) };
     }
 
-    subOn = rp (ids::subOn); subWave = rp (ids::subWave); subLevel = rp (ids::subLevel);
-    noiseType = rp (ids::noiseType); noiseLevel = rp (ids::noiseLevel); noiseTone = rp (ids::noiseTone);
+    subOn = rp (ids::subOn); subWave = rp (ids::subWave); subLevel = rp (ids::subLevel); subPan = rp (ids::subPan);
+    noiseType = rp (ids::noiseType); noiseLevel = rp (ids::noiseLevel); noiseTone = rp (ids::noiseTone); noisePan = rp (ids::noisePan);
 
     filterOn = rp (ids::filterOn); filterType = rp (ids::filterType); cutoff = rp (ids::cutoff);
     resonance = rp (ids::resonance); filterDrive = rp (ids::filterDrive); keyTrack = rp (ids::keyTrack);
@@ -306,9 +308,11 @@ juce::String getTooltip (const juce::String& id)
         m[ids::subOn]      = "Sub oscillator: one octave below oscillator 1.";
         m[ids::subWave]    = "Sub oscillator waveform: sine or square.";
         m[ids::subLevel]   = "Sub oscillator level.";
+        m[ids::subPan]     = "Sub oscillator stereo position.";
         m[ids::noiseType]  = "Noise color: white (bright) or pink (warm).";
         m[ids::noiseLevel] = "Noise generator level.";
         m[ids::noiseTone]  = "Noise tone: negative = darker, positive = brighter.";
+        m[ids::noisePan]   = "Noise generator stereo position.";
 
         m[ids::filterOn]     = "Enable the voice filter.";
         m[ids::filterType]   = "Filter mode: low-pass, high-pass, band-pass or notch (12/24 dB).";
